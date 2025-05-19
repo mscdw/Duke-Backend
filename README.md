@@ -9,6 +9,7 @@ This project is a FastAPI-based proxy API for interacting with the Duke REST API
 - Secure, environment-based configuration
 - Proxies all endpoints from the Duke server
 - Robust error handling and logging
+- Automated unit tests for all endpoints
 - OpenAPI docs at `/docs`
 
 ## Requirements

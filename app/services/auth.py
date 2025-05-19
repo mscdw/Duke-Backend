@@ -13,7 +13,7 @@ CLIENT_NAME = settings.AVIGILON_CLIENT_NAME
 USER_NONCE = settings.AVIGILON_USER_NONCE
 USER_KEY = settings.AVIGILON_USER_KEY
 
-logger = logging.getLogger("avigilon-api")
+logger = logging.getLogger("avigilon-login")
 
 def generate_auth_token():
     epoch = int(time.time())
