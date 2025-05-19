@@ -1,8 +1,19 @@
-from pydantic import BaseSettings
+from functools import lru_cache
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    app_name: str = "Avigilon Web Endpoints"
-    database_url: str = "postgresql://user:password@localhost/dbname"
+    AVIGILON_BASE_URL: str = ""
+    AVIGILON_USERNAME: str = ""
+    AVIGILON_PASSWORD: str = ""
+    AVIGILON_CLIENT_NAME: str = ""
+    AVIGILON_USER_NONCE: str = ""
+    AVIGILON_USER_KEY: str = ""
+    AVIGILON_API_VERIFY_SSL: bool = False
+    LOG_LEVEL: str = "INFO"
 
     class Config:
         env_file = ".env"
+
+@lru_cache()
+def get_settings():
+    return Settings()
