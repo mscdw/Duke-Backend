@@ -6,7 +6,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-AVIGILON_BASE_URL = settings.AVIGILON_BASE_URL
+AVIGILON_BASE_URL = "https://10.89.26.169:8443/mt/api/rest/v1" #settings.AVIGILON_BASE_URL
 USERNAME = settings.AVIGILON_USERNAME
 PASSWORD = settings.AVIGILON_PASSWORD
 CLIENT_NAME = settings.AVIGILON_CLIENT_NAME
@@ -23,7 +23,7 @@ def generate_auth_token():
 
 async def authenticate():
     try:
-        async with httpx.AsyncClient(verify=settings.AVIGILON_API_VERIFY_SSL, timeout=10) as client:
+        async with httpx.AsyncClient(verify=False, timeout=10) as client:
             response = await client.post(
                 f"{AVIGILON_BASE_URL}/login",
                 json={"username": USERNAME, "password": PASSWORD, "clientName": CLIENT_NAME, "authorizationToken": generate_auth_token()},
@@ -31,6 +31,8 @@ async def authenticate():
                 timeout=10
             )
             response.raise_for_status()
+            json_response = response.json()
+            settings.SESSION_TOKEN=json_response["result"]["session"]
             logger.info("Successfully authenticated with Avigilon API.")
     except Exception as e:
         logger.error(f"Authentication failed: {e}")

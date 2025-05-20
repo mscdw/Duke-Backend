@@ -37,6 +37,4 @@ app = FastAPI(
 def index():
     return "Welcome to Duke proxy API"
 
-# app.include_router(events_router, tags=["Events"])
-# app.include_router(webhook_router, tags=["Webhooks"])
-# app.include_router(duke_router, tags=["Duke Proxy"])
+app.include_router(router, tags=["Duke Proxy"])
