@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.services.auth import authenticate
 from app.api.endpoints import router
+from app.api.server_events import router as server_events_router
 
 # Configure logging
 logging.basicConfig(
@@ -37,4 +38,5 @@ app = FastAPI(
 def index():
     return "Welcome to Duke proxy API"
 
-app.include_router(router, tags=["Duke Proxy"])
+app.include_router(router)
+app.include_router(server_events_router)
