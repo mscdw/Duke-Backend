@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     AVIGILON_USER_KEY: str = ""
     AVIGILON_API_VERIFY_SSL: bool = False
     LOG_LEVEL: str = "INFO"
-    SESSION_TOKEN: str = ""
+    SESSION_TOKEN: str = "AXUAiv8KEDwecCpYnExqpbLKs4o-P0QSFgoUcoahlIJ7oc7ICRPhqi88n-fN5iIaEPS_gZgRUk4_iIWJpKZdJSEiEJ3v7ciUrk-1vErULZEKhfAqBmNoYXJhbjIdGhD15XlQda5BXYa0iielLzcHKglkZXZlbG9wZXI"
     class Config:
         env_file = ".env"
 
