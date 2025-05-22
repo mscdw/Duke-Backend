@@ -22,6 +22,9 @@ def generate_auth_token():
     return f"{USER_NONCE}:{epoch}:{hash_output}"
 
 async def authenticate():
+    if getattr(settings, "SESSION_TOKEN", None):
+        logger.info("SESSION_TOKEN already exists, skipping authentication request")
+        return
     try:
         async with httpx.AsyncClient(verify=False, timeout=10) as client:
             response = await client.post(
@@ -32,8 +35,8 @@ async def authenticate():
             )
             response.raise_for_status()
             json_response = response.json()
-            settings.SESSION_TOKEN=json_response["result"]["session"]
-            logger.info("Successfully authenticated with Avigilon API.")
+            settings.SESSION_TOKEN = json_response["result"]["session"]
+            logger.info("Successfully authenticated with Avigilon API")
     except Exception as e:
         logger.error(f"Authentication failed: {e}")
         raise
