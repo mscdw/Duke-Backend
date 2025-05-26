@@ -77,8 +77,8 @@ async def get_events_service():
         logger.error(f"Get events subtopics failed: {exc}")
         return None
 
-async def get_recent_events_service(serverId, queryType):
-    url = f"{AVIGILON_BASE_URL}/events/search?session={settings.SESSION_TOKEN}&limit=10&serverId={serverId}&queryType={queryType}"
+async def get_active_events_service(serverId):
+    url = f"{AVIGILON_BASE_URL}/events/search?session={settings.SESSION_TOKEN}&limit=10&serverId={serverId}&queryType=ACTIVE"
     try:
         async with httpx.AsyncClient(verify=verify_ssl, timeout=10) as client:
             resp = await client.get(url)
@@ -103,4 +103,23 @@ async def post_media_service(body, cameraId=None, format=None, t=None):
             return resp
     except httpx.RequestError as exc:
         logger.error(f"Post media failed: {exc}")
+        return None
+
+async def search_events_service(from_time, to_time, server_id, limit=5, event_topics="ALL"):
+    url = f"{AVIGILON_BASE_URL}/events/search"
+    params = {
+        "session": settings.SESSION_TOKEN,
+        "queryType": "TIME_RANGE",
+        "from": from_time,
+        "to": to_time,
+        "serverId": server_id,
+        "limit": limit,
+        "eventTopics": event_topics
+    }
+    try:
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=10) as client:
+            resp = await client.get(url, params=params)
+            return resp
+    except httpx.RequestError as exc:
+        logger.error(f"Event search failed: {exc}")
         return None
