@@ -19,13 +19,10 @@ endpoints = [
     ("Media", "/media", "POST"),
 ]
 
-st.sidebar.header("API Endpoint Settings")
-api_base = st.sidebar.text_input("API Base URL", API_BASE)
-
 st.header("API Endpoints")
 for name, path, method in endpoints:
     st.subheader(name)
-    url = api_base + path
+    url = API_BASE + path
     if method == "GET":
         if path == "/site":
             site_id = st.text_input(f"Site ID for {name}", "")
