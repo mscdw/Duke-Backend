@@ -34,7 +34,7 @@ from_date = st.sidebar.date_input("From Date", datetime(2025, 5, 1))
 to_date = st.sidebar.date_input("To Date", datetime(2025, 5, 30))
 from_time = datetime.combine(from_date, datetime.min.time()).isoformat() + ".000Z"
 to_time = datetime.combine(to_date, datetime.min.time()).isoformat() + ".000Z"
-limit = st.sidebar.number_input("Limit",  value=20)
+limit = st.sidebar.number_input("Limit",  value=50)
 event_topics = st.sidebar.selectbox("Event Topics", event_subtopics)
 
 if 'events_df' not in st.session_state:
@@ -79,7 +79,35 @@ if st.button("Search Events"):
             st.error(f"Failed to fetch events: {e}")
 
 if st.session_state.get('events_df') is not None:
-    st.dataframe(st.session_state['events_df'], height=600)
+    tab1, tab2 = st.tabs(["All Events", "Media Events"])
+    with tab1:
+        st.dataframe(st.session_state['events_df'], height=600)
+    with tab2:
+        df = st.session_state['events_df']
+        filtered_df = df[df['type'] == 'DEVICE_CLASSIFIED_OBJECT_MOTION_START']
+        display_cols = ['thisId', 'timestamp', 'originatingEventId', 'originatingServerId', 'recordTriggerParams', 'cameraId']
+        available_cols = [col for col in display_cols if col in filtered_df.columns]
+        if not filtered_df.empty and available_cols:
+            for idx, row in filtered_df.iterrows():
+                cols = st.columns([4, 4])
+                with cols[0]:
+                    st.write({col: row[col] for col in available_cols})
+                with cols[1]:
+                    if 'cameraId' in row and 'timestamp' in row:
+                        if st.button(f"Fetch Media {row['thisId']}", key=f"media_{row['thisId']}"):
+                            with st.spinner("Fetching media..."):
+                                try:
+                                    params = {
+                                        'cameraId': row['cameraId'],
+                                        't': row['timestamp']
+                                    }
+                                    media_resp = requests.get(f"{API_URL}/media", params=params)
+                                    media_resp.raise_for_status()
+                                    st.video(media_resp.content)
+                                except Exception as e:
+                                    st.error(f"Failed to fetch media: {e}")
+        else:
+            st.info("No DEVICE_CLASSIFIED_OBJECT_MOTION_START events found for the selected parameters.")
     if st.session_state.get('events_token'):
         if st.button("Extend Search", key="extend_search"):
             with st.spinner("Fetching more events..."):

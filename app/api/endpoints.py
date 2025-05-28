@@ -61,12 +61,3 @@ async def get_events():
         return Response(content=resp.text, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
     else:
         return Response(content="{}", status_code=503, media_type="application/json")
-
-@router.get("/api/media", response_class=Response)
-async def post_media(request: Request, cameraId: Optional[str] = Query(None), format: Optional[str] = Query(None), t: Optional[str] = Query(None)):
-    body = await request.body()
-    resp = await post_media_service(body, cameraId, format, t)
-    if resp:
-        return Response(content=resp.content, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/octet-stream"))
-    else:
-        return Response(content=b"", status_code=503, media_type="application/octet-stream")

@@ -46,3 +46,18 @@ async def search_events_service(from_time, to_time, server_id, limit, event_topi
         logger.error(f"Event search failed: {exc}")
         return None
 
+async def get_media_service(camera_id, t):
+    url = f"{AVIGILON_BASE_URL}/media"
+    params = {
+        "session": settings.SESSION_TOKEN,
+        "cameraId": camera_id,
+        "t": t
+    }
+    try:
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=10) as client:
+            resp = await client.get(url, params=params)
+            return resp
+    except httpx.RequestError as exc:
+        logger.error(f"Fetch media failed: {exc}")
+        return None
+
