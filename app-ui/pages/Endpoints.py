@@ -14,9 +14,7 @@ endpoints = [
     ("Sites", "/sites", "GET"),
     ("Site (by ID)", "/site", "GET"),
     ("Servers", "/servers", "GET"),
-    ("Event Subtopics", "/event-subtopics", "GET"),
-    ("Events", "/events", "GET"),
-    ("Media", "/media", "POST"),
+    ("Event Subtopics", "/event-subtopics", "GET")
 ]
 
 st.header("API Endpoints")
@@ -35,18 +33,6 @@ for name, path, method in endpoints:
                         st.json(resp.json() if resp.headers.get("content-type","").startswith("application/json") else resp.text)
                     except Exception as e:
                         st.error(f"Error: {e}")
-        elif path == "/events":
-            server_id = st.text_input("serverId for Events", "")
-            query_type = st.text_input("queryType for Events", "ACTIVE")
-            params = {"serverId": server_id, "queryType": query_type} if server_id and query_type else {}
-            if st.button(f"Fetch {name}"):
-                with st.spinner(f"Fetching {name}..."):
-                    try:
-                        resp = requests.get(url, params=params)
-                        st.write(f"Status: {resp.status_code}")
-                        st.json(resp.json() if resp.headers.get("content-type","").startswith("application/json") else resp.text)
-                    except Exception as e:
-                        st.error(f"Error: {e}")
         else:
             if st.button(f"Fetch {name}"):
                 with st.spinner(f"Fetching {name}..."):
@@ -56,25 +42,4 @@ for name, path, method in endpoints:
                         st.json(resp.json() if resp.headers.get("content-type","").startswith("application/json") else resp.text)
                     except Exception as e:
                         st.error(f"Error: {e}")
-    elif method == "POST":
-        st.write("Media POST endpoint. Provide cameraId, format, t as query params and binary body if needed.")
-        camera_id = st.text_input("cameraId", "")
-        format_ = st.text_input("format", "")
-        t = st.text_input("t", "")
-        file = st.file_uploader("Upload media body (optional)")
-        params = {}
-        if camera_id:
-            params["cameraId"] = camera_id
-        if format_:
-            params["format"] = format_
-        if t:
-            params["t"] = t
-        if st.button(f"POST {name}"):
-            with st.spinner(f"Posting to {name}..."):
-                try:
-                    body = file.read() if file else b""
-                    resp = requests.post(url, params=params, data=body)
-                    st.write(f"Status: {resp.status_code}")
-                    st.json(resp.json() if resp.headers.get("content-type","").startswith("application/json") else resp.text)
-                except Exception as e:
-                    st.error(f"Error: {e}")
+    
