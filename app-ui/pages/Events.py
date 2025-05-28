@@ -37,6 +37,11 @@ to_time = datetime.combine(to_date, datetime.min.time()).isoformat() + ".000Z"
 limit = st.sidebar.number_input("Limit",  value=20)
 event_topics = st.sidebar.selectbox("Event Topics", event_subtopics)
 
+if 'events_df' not in st.session_state:
+    st.session_state['events_df'] = None
+if 'events_token' not in st.session_state:
+    st.session_state['events_token'] = None
+
 if st.button("Search Events"):
     if(query_type == "ACTIVE"):
         params = {
@@ -61,14 +66,45 @@ if st.button("Search Events"):
             events = data['result']['events']
             token = data['result'].get('token')
             if not events:
+                st.session_state['events_df'] = None
+                st.session_state['events_token'] = None
                 st.info("No events found for the given parameters.")
             else:
                 df = pd.DataFrame(events)
-                st.dataframe(df, height=min(15, len(df)) * 40)
-            if token:
-                if st.button("Extend Search"):
-                    st.info(f"Extend search with token: {token}")
+                st.session_state['events_df'] = df
+                st.session_state['events_token'] = token
         except Exception as e:
+            st.session_state['events_df'] = None
+            st.session_state['events_token'] = None
             st.error(f"Failed to fetch events: {e}")
+
+if st.session_state.get('events_df') is not None:
+    st.dataframe(st.session_state['events_df'], height=600)
+    if st.session_state.get('events_token'):
+        if st.button("Extend Search", key="extend_search"):
+            with st.spinner("Fetching more events..."):
+                try:
+                    continue_params = {
+                        "query_type": "CONTINUE",
+                        "token": st.session_state['events_token']
+                    }
+                    continue_resp = requests.get(f"{API_URL}/events-search", params=continue_params)
+                    continue_resp.raise_for_status()
+                    continue_data = continue_resp.json()
+                    more_events = continue_data['result'].get('events', [])
+                    new_token = continue_data['result'].get('token')
+                    if more_events:
+                        df = pd.concat([st.session_state['events_df'], pd.DataFrame(more_events)], ignore_index=True)
+                        if new_token and new_token != st.session_state['events_token']:
+                            st.session_state['events_token'] = new_token
+                        else:
+                            st.session_state['events_token'] = None
+                        st.session_state['events_df'] = df
+                        st.rerun()
+                    else:
+                        st.session_state['events_token'] = None
+                        st.info("No more events found.")
+                except Exception as e:
+                    st.error(f"Failed to fetch more events: {e}")
 else:
     st.info("Fill in the parameters and click 'Search Events' to load data.")

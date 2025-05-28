@@ -9,7 +9,7 @@ logger = logging.getLogger("avigilon-server-events")
 @router.get("/api/events-search", response_class=Response)
 async def events_search(
     query_type: str,
-    serverId: str,
+    serverId: Optional[str] = Query(None),
     from_time: Optional[str] = Query(None),
     to_time: Optional[str] = Query(None),
     token: Optional[str] = Query(None),
