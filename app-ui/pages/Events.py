@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime
+import json
 
 st.set_page_config(page_title="Events", layout="wide")
 st.title("Avigilon Server Events Dashboard")
@@ -94,18 +95,34 @@ if st.session_state.get('events_df') is not None:
                     st.write({col: row[col] for col in available_cols})
                 with cols[1]:
                     if 'cameraId' in row and 'timestamp' in row:
-                        if st.button(f"Fetch Media {row['thisId']}", key=f"media_{row['thisId']}"):
-                            with st.spinner("Fetching media..."):
+                        fetch_type = st.selectbox(
+                            f"Select fetch type for {row['thisId']}",
+                            options=["Video", "JSON"],
+                            key=f"fetch_type_{row['thisId']}"
+                        )
+                        if st.button(f"Fetch {fetch_type} {row['thisId']}", key=f"fetch_{row['thisId']}"):
+                            with st.spinner(f"Fetching {fetch_type.lower()}..."):
                                 try:
                                     params = {
                                         'cameraId': row['cameraId'],
                                         't': row['timestamp']
                                     }
+                                    if fetch_type == "JSON":
+                                        params['format'] = 'json'
                                     media_resp = requests.get(f"{API_URL}/media", params=params)
                                     media_resp.raise_for_status()
-                                    st.video(media_resp.content)
+                                    if fetch_type == "Video":
+                                        st.video(media_resp.content)
+                                    else:
+                                        try:
+                                            ndjson_lines = media_resp.content.decode('utf-8').splitlines()
+                                            for line in ndjson_lines:
+                                                if line.strip():
+                                                    st.json(json.loads(line))
+                                        except Exception:
+                                            st.write(media_resp.content)
                                 except Exception as e:
-                                    st.error(f"Failed to fetch media: {e}")
+                                    st.error(f"Failed to fetch {fetch_type.lower()}: {e}")
         else:
             st.info("No DEVICE_CLASSIFIED_OBJECT_MOTION_START events found for the selected parameters.")
     if st.session_state.get('events_token'):

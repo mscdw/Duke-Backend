@@ -1,7 +1,8 @@
 import logging
 from typing import Optional
 from fastapi import APIRouter, Response, Query
-from app.services.events_api import get_active_events_service, search_events_service, get_continue_events_service, get_media_service
+from app.services.events_api import get_active_events_service, search_events_service, get_continue_events_service
+from app.services.media_api import get_media_service
 
 router = APIRouter()
 logger = logging.getLogger("avigilon-server-events")
@@ -43,10 +44,11 @@ async def events_search(
 @router.get("/api/media", response_class=Response)
 async def media(
     cameraId: str,
-    t: str
+    t: str,
+    format: Optional[str] = Query("fmp4")
 ):
     try:
-        media_resp = await get_media_service(camera_id=cameraId, t=t)
+        media_resp = await get_media_service(camera_id=cameraId, t=t, format=format)
         if not media_resp or media_resp.status_code != 200:
             logger.error(f"Failed to fetch media: {media_resp.text if media_resp else 'No response'}")
             return Response(content="{}", status_code=503, media_type="application/json")
