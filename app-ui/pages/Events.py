@@ -85,7 +85,7 @@ if st.session_state.get('events_df') is not None:
         st.dataframe(st.session_state['events_df'], height=600)
     with tab2:
         df = st.session_state['events_df']
-        filtered_df = df[df['type'] == 'DEVICE_CLASSIFIED_OBJECT_MOTION_START']
+        filtered_df = df[df['type'] == 'DEVICE_FACET_START']
         display_cols = ['thisId', 'timestamp', 'originatingEventId', 'originatingServerId', 'recordTriggerParams', 'cameraId']
         available_cols = [col for col in display_cols if col in filtered_df.columns]
         if not filtered_df.empty and available_cols:
@@ -98,9 +98,9 @@ if st.session_state.get('events_df') is not None:
                         fetch_type = st.selectbox(
                             f"Select fetch type for {row['thisId']}",
                             options=["Video", "JSON"],
-                            key=f"fetch_type_{row['thisId']}"
+                            key=f"fetch_type_{idx}"
                         )
-                        if st.button(f"Fetch {fetch_type} {row['thisId']}", key=f"fetch_{row['thisId']}"):
+                        if st.button(f"Fetch {fetch_type} {row['thisId']}", key=f"fetch_{idx}"):
                             with st.spinner(f"Fetching {fetch_type.lower()}..."):
                                 try:
                                     params = {
@@ -124,7 +124,7 @@ if st.session_state.get('events_df') is not None:
                                 except Exception as e:
                                     st.error(f"Failed to fetch {fetch_type.lower()}: {e}")
         else:
-            st.info("No DEVICE_CLASSIFIED_OBJECT_MOTION_START events found for the selected parameters.")
+            st.info("No DEVICE_FACET_START events found for the selected parameters.")
     if st.session_state.get('events_token'):
         if st.button("Extend Search", key="extend_search"):
             with st.spinner("Fetching more events..."):
