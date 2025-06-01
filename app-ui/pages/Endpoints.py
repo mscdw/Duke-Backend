@@ -14,7 +14,8 @@ endpoints = [
     ("Sites", "/sites", "GET"),
     ("Site (by ID)", "/site", "GET"),
     ("Servers", "/servers", "GET"),
-    ("Event Subtopics", "/event-subtopics", "GET")
+    ("Event Subtopics", "/event-subtopics", "GET"),
+    ("Appearance Descriptions", "/appearance-descriptions", "GET")
 ]
 
 st.header("API Endpoints")
@@ -42,4 +43,3 @@ for name, path, method in endpoints:
                         st.json(resp.json() if resp.headers.get("content-type","").startswith("application/json") else resp.text)
                     except Exception as e:
                         st.error(f"Error: {e}")
-    

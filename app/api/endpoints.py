@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Request, Response, Query
+from fastapi import APIRouter, Response, Query
 from typing import Optional
 from app.services.avigilon_api import *
 
@@ -55,8 +55,16 @@ async def get_servers():
         return Response(content="{}", status_code=503, media_type="application/json")
 
 @router.get("/api/event-subtopics", response_class=Response)
-async def get_events():
-    resp = await get_events_service()
+async def get_events_subtopics():
+    resp = await get_events_subtopics_service()
+    if resp:
+        return Response(content=resp.text, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
+    else:
+        return Response(content="{}", status_code=503, media_type="application/json")
+
+@router.get("/api/appearance-descriptions", response_class=Response)
+async def get_appearance_descriptions():
+    resp = await get_appearance_descriptions_service()
     if resp:
         return Response(content=resp.text, status_code=resp.status_code, media_type=resp.headers.get("content-type", "application/json"))
     else:

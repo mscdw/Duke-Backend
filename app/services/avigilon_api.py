@@ -67,7 +67,7 @@ async def get_servers_service():
         logger.error(f"Get servers failed: {exc}")
         return None
 
-async def get_events_service():
+async def get_events_subtopics_service():
     url = f"{AVIGILON_BASE_URL}/event-subtopics"
     try:
         async with httpx.AsyncClient(verify=verify_ssl, timeout=10) as client:
@@ -75,5 +75,15 @@ async def get_events_service():
             return resp
     except httpx.RequestError as exc:
         logger.error(f"Get events subtopics failed: {exc}")
+        return None
+
+async def get_appearance_descriptions_service():
+    url = f"{AVIGILON_BASE_URL}/appearance/descriptions?session={settings.SESSION_TOKEN}"
+    try:
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=10) as client:
+            resp = await client.get(url)
+            return resp
+    except httpx.RequestError as exc:
+        logger.error(f"Get appearance descriptions failed: {exc}")
         return None
 
