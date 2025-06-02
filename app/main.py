@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from app.services.auth import authenticate
 from app.api.endpoints import router
 from app.api.server_events import router as server_events_router
+from app.api.appearance_events import router as appearance_events_router
 
 # Configure logging
 logging.basicConfig(
@@ -40,3 +41,4 @@ def index():
 
 app.include_router(router)
 app.include_router(server_events_router)
+app.include_router(appearance_events_router)

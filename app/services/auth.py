@@ -6,7 +6,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-AVIGILON_BASE_URL = "https://10.89.26.169:8443/mt/api/rest/v1" #settings.AVIGILON_BASE_URL
+AVIGILON_BASE_URL = "https://10.89.26.170:8443/mt/api/rest/v1" #settings.AVIGILON_BASE_URL
 USERNAME = settings.AVIGILON_USERNAME
 PASSWORD = settings.AVIGILON_PASSWORD
 CLIENT_NAME = settings.AVIGILON_CLIENT_NAME

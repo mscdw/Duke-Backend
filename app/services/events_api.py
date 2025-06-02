@@ -4,8 +4,8 @@ from app.core.config import get_settings
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
-AVIGILON_BASE_URL = "https://10.89.26.169:8443/mt/api/rest/v1"
-logger = logging.getLogger("avigilon-service")
+AVIGILON_BASE_URL = "https://10.89.26.170:8443/mt/api/rest/v1"
+logger = logging.getLogger("avigilon-events-service")
 
 async def get_active_events_service(server_id, limit):
     url = f"{AVIGILON_BASE_URL}/events/search?session={settings.SESSION_TOKEN}&limit={limit}&serverId={server_id}&queryType=ACTIVE"

@@ -5,7 +5,7 @@ from app.services.events_api import get_active_events_service, search_events_ser
 from app.services.media_api import get_media_service
 
 router = APIRouter()
-logger = logging.getLogger("avigilon-server-events")
+logger = logging.getLogger("avigilon-device-events")
 
 @router.get("/api/events-search", response_class=Response)
 async def events_search(

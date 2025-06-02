@@ -4,8 +4,8 @@ from app.core.config import get_settings
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
-AVIGILON_BASE_URL = "https://10.89.26.169:8443/mt/api/rest/v1"
-logger = logging.getLogger("avigilon-service")
+AVIGILON_BASE_URL = "https://10.89.26.170:8443/mt/api/rest/v1"
+logger = logging.getLogger("avigilon-media-service")
 
 async def get_media_service(camera_id, t, format):
     url = f"{AVIGILON_BASE_URL}/media"
