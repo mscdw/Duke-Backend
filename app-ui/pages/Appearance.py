@@ -4,6 +4,7 @@ import json
 import io
 from PIL import Image
 from collections import defaultdict
+import base64
 
 st.set_page_config(page_title="Appearance Search", layout="wide")
 st.title("Avigilon Appearance Search")
@@ -44,10 +45,10 @@ if appearance_search_type == "appearances":
         ["detectedObjects", "images", "imageUrls"]
     )
     if appearances_type == "detectedObjects":
-        source_camera_id = st.sidebar.text_input("Source Camera ID", "4xIx1DMwMLSwMDW1TDMwS9RLTsw1MBYSCK_Sf7KRwfHW3n-6ya4R3z4DAA")
-        source_time = st.sidebar.text_input("Source Time (ISO 8601)", "2025-05-27T18:23:02.630Z")
-        object_id = st.sidebar.number_input("Object ID", value=4680776, step=1)
-        generator_id = st.sidebar.number_input("Generator ID", value=5, step=1)
+        source_camera_id = st.sidebar.text_input("Source Camera ID")
+        source_time = st.sidebar.text_input("Source Time (ISO 8601)")
+        object_id = st.sidebar.number_input("Object ID", step=1)
+        generator_id = st.sidebar.number_input("Generator ID",  step=1)
         appearances_value = [
             {
                 "sourceCameraId": source_camera_id,
@@ -163,6 +164,11 @@ if st.session_state.get('appearance_results') is not None:
                                     media_resp = requests.get(f"{API_BASE}/media", params=params)
                                     media_resp.raise_for_status()
                                     image = Image.open(io.BytesIO(media_resp.content))
+                                    st.image(image)
+                                    buffered = io.BytesIO()
+                                    image.save(buffered, format="JPEG")
+                                    img_b64 = base64.b64encode(buffered.getvalue()).decode()
+                                    st.text_area("Base64 of Full Image", img_b64, height=150)
                                     width, height = image.size
                                     left = int(roi['left'] * width)
                                     top = int(roi['top'] * height)
@@ -170,12 +176,17 @@ if st.session_state.get('appearance_results') is not None:
                                     bottom = int(roi['bottom'] * height)
                                     cropped = image.crop((left, top, right, bottom))
                                     st.image(cropped)
+                                    buffered = io.BytesIO()
+                                    cropped.save(buffered, format="JPEG")
+                                    img_b64 = base64.b64encode(buffered.getvalue()).decode()
+                                    st.text_area("Base64 of Cropped Image", img_b64, height=150)
                                 except Exception as e:
                                     st.error(f"Failed to fetch/crop image: {e}")
                         else:
                             st.warning("Missing deviceGid, timestamp, or roi for ROI fetch.")
         else:
             st.info("No snapshots available for this instance.")
+
     if st.session_state.get('appearance_token'):
         if st.button("Extend Search", key="extend_search"):
             with st.spinner("Fetching more appearances..."):
