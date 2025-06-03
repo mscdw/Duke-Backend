@@ -2,19 +2,18 @@
 
 ## Overview
 
-This project is a FastAPI-based proxy API for interacting with the Duke REST API, providing endpoints for health checks, login, camera/site/server/event/media queries, and webhooks. It is designed for secure, production-ready deployments with Docker and includes comprehensive automated tests.
+This project is a FastAPI-based proxy API for interacting with the Avigilon REST API, providing endpoints for health checks, login, camera/site/server/event/media queries, and appearance/event webhooks. It is designed for secure, production-ready deployments and includes comprehensive automated tests.
 
 ## Features
 - Async FastAPI app with modular routers
-- Secure, environment-based configuration
-- Proxies all endpoints from the Duke server
+- Secure, environment-based configuration using `.env`
+- Proxies all endpoints from the Avigilon server
 - Robust error handling and logging
 - Automated unit tests for all endpoints
 - OpenAPI docs at `/docs`
 
 ## Requirements
 - Python 3.10+
-- Docker
 
 ## Environment Variables
 Create a `.env` file in the project root with the following variables:
@@ -27,6 +26,7 @@ AVIGILON_PASSWORD=your-avigilon-password
 AVIGILON_CLIENT_NAME=your-avigilon-client-name
 AVIGILON_USER_NONCE=your-avigilon-user-nonce
 AVIGILON_USER_KEY=your-avigilon-user-key
+AVIGILON_API_VERIFY_SSL=false
 # Logging
 LOG_LEVEL=INFO
 ```
@@ -36,7 +36,7 @@ LOG_LEVEL=INFO
 1. **Clone the repo:**
    ```sh
    git clone <repo-url>
-   cd duke-energy-poc
+   cd duke-backend
    ```
 2. **Create and activate a virtualenv:**
    ```sh
@@ -65,18 +65,20 @@ pytest
 ## API Endpoints
 
 - `GET /api/health`
-- `GET /api/web-capabilities`
-- `POST /api/login`
-- `GET /api/cameras?session=...`
-- `GET /api/sites?session=...`
-- `GET /api/site?session=...&id=...`
-- `GET /api/servers?session=...`
-- `GET /api/events`
-- `POST /api/media?session=...&cameraId=...&format=...&t=...`
-- `POST /webhook/events`
+- `GET /api/wep-capabilities`
+- `GET /api/cameras`
+- `GET /api/sites`
+- `GET /api/site?id=...`
+- `GET /api/servers`
+- `GET /api/event-subtopics`
+- `GET /api/appearance-descriptions`
+- `GET /api/events-search`
+- `GET /api/media`
+- `POST /api/appearance-search`
+- `POST /api/appearance-search-by-description`
 
 ## Security Notes
-- **Do not use `verify=False` in production.** For local/dev, you may set `DUKE_API_VERIFY_SSL=false` in your `.env` (update code to use this variable for httpx client).
+- **Do not use `verify=False` in production.** For local/dev, you may set `AVIGILON_API_VERIFY_SSL=false` in your `.env`.
 - Never commit secrets or `.env` files to version control.
 
 ## Logging
