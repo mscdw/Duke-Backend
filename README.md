@@ -19,16 +19,13 @@ This project is a FastAPI-based proxy API for interacting with the Avigilon REST
 Create a `.env` file in the project root with the following variables:
 
 ```
-# Avigilon API
 AVIGILON_BASE_URL=https://your-avigilon-url
 AVIGILON_USERNAME=your-avigilon-username
 AVIGILON_PASSWORD=your-avigilon-password
 AVIGILON_CLIENT_NAME=your-avigilon-client-name
 AVIGILON_USER_NONCE=your-avigilon-user-nonce
 AVIGILON_USER_KEY=your-avigilon-user-key
-AVIGILON_API_VERIFY_SSL=false
-# Logging
-LOG_LEVEL=INFO
+AVIGILON_API_VERIFY_SSL=False
 ```
 
 ## Setup (Local Development)
@@ -56,12 +53,6 @@ LOG_LEVEL=INFO
    - Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
    - ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-## Running Tests
-
-```sh
-pytest
-```
-
 ## API Endpoints
 
 - `GET /api/health`
@@ -78,15 +69,5 @@ pytest
 - `POST /api/appearance-search-by-description`
 
 ## Security Notes
-- **Do not use `verify=False` in production.** For local/dev, you may set `AVIGILON_API_VERIFY_SSL=false` in your `.env`.
+- **Do not use `verify=False` in production.** For local/dev, you may set `AVIGILON_API_VERIFY_SSL=False` in your `.env`.
 - Never commit secrets or `.env` files to version control.
-
-## Logging
-- Logging is configured via the `LOG_LEVEL` env variable.
-
-## Contributing
-Pull requests are welcome! Please add/maintain tests for any new features or bugfixes.
-
----
-
-For any issues, contact the project maintainer.
