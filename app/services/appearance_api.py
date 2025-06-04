@@ -5,7 +5,7 @@ from typing import Optional
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
-AVIGILON_BASE_URL = "https://10.89.26.170:8443/mt/api/rest/v1"
+AVIGILON_BASE = settings.AVIGILON_BASE
 logger = logging.getLogger("avigilon-appearance-service")
 
 async def search_appearance_service(
@@ -17,7 +17,7 @@ async def search_appearance_service(
     scan_type: Optional[str] = "FULL",
     token: Optional[str] = None
 ):
-    url = f"{AVIGILON_BASE_URL}/appearance/search"
+    url = f"{AVIGILON_BASE}/appearance/search"
     if token:
         form_data = {
             "session": settings.SESSION_TOKEN,
@@ -52,7 +52,7 @@ async def search_by_description_service(
     scan_type: Optional[str] = "FULL",
     token: Optional[str] = None
 ):
-    url = f"{AVIGILON_BASE_URL}/appearance/search-by-description"
+    url = f"{AVIGILON_BASE}/appearance/search-by-description"
     if token:
         form_data = {
             "session": settings.SESSION_TOKEN,

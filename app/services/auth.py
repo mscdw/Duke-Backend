@@ -6,7 +6,7 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-AVIGILON_BASE_URL = "https://10.89.26.170:8443/mt/api/rest/v1" #settings.AVIGILON_BASE_URL
+AVIGILON_BASE = settings.AVIGILON_BASE #settings.AVIGILON_BASE
 USERNAME = settings.AVIGILON_USERNAME
 PASSWORD = settings.AVIGILON_PASSWORD
 CLIENT_NAME = settings.AVIGILON_CLIENT_NAME
@@ -28,7 +28,7 @@ async def authenticate():
     try:
         async with httpx.AsyncClient(verify=False, timeout=10) as client:
             response = await client.post(
-                f"{AVIGILON_BASE_URL}/login",
+                f"{AVIGILON_BASE}/login",
                 json={"username": USERNAME, "password": PASSWORD, "clientName": CLIENT_NAME, "authorizationToken": generate_auth_token()},
                 headers={"content-type": "application/json"},
                 timeout=10

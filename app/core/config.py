@@ -2,7 +2,7 @@ from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    AVIGILON_BASE_URL: str = ""
+    AVIGILON_BASE: str = ""
     AVIGILON_USERNAME: str = ""
     AVIGILON_PASSWORD: str = ""
     AVIGILON_CLIENT_NAME: str = ""
