@@ -3,8 +3,10 @@ from fastapi import APIRouter, Response, Query
 from fastapi.responses import JSONResponse
 from app.services.appearance_api import search_appearance_service, search_by_description_service
 from app.services.avigilon_api import get_cameras_service
+from app.services.media_api import get_media_service
 from pydantic import BaseModel
 from typing import Optional, List, Dict
+import base64
 
 router = APIRouter()
 logger = logging.getLogger("avigilon-appearance-events")
@@ -93,6 +95,9 @@ async def all_face_events_fetch(date: str = Query(..., description="Date in YYYY
                 if snap.get("type") == "APPEARANCE_SEARCH_SNAPSHOT_TYPE_FACE":
                     snap_flat = flat_item.copy()
                     snap_flat["eventTimestamp"] = snap["timestamp"]
+                    media_resp = await get_media_service(snap_flat["cameraId"], snap["timestamp"], "jpeg")
+                    image_base64 = base64.b64encode(media_resp.content).decode("utf-8")
+                    snap_flat["imageBaseString"] = image_base64
                     flat_results.append(snap_flat)
         if token:
             resp = await search_by_description_service(token=token)
