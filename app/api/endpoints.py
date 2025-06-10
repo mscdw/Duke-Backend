@@ -1,10 +1,10 @@
-import logging
 from fastapi import APIRouter, Response, Query
 from typing import Optional
 from app.services.avigilon_api import *
+from app.core.logging import get_logger
 
 router = APIRouter()
-logger = logging.getLogger("avigilon-endpoints")
+logger = get_logger("avigilon-endpoints")
 
 @router.get("/api/health", response_class=Response)
 async def health_check():

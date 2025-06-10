@@ -1,11 +1,11 @@
 import httpx
-import logging
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
 AVIGILON_BASE = settings.AVIGILON_BASE
-logger = logging.getLogger("avigilon-service")
+logger = get_logger("avigilon-service")
 
 async def health_check_service():
     url = f"{AVIGILON_BASE}/health"

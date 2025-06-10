@@ -1,8 +1,8 @@
 import httpx
-import logging
 import time
 import hashlib
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
 settings = get_settings()
 
@@ -13,7 +13,7 @@ CLIENT_NAME = settings.AVIGILON_CLIENT_NAME
 USER_NONCE = settings.AVIGILON_USER_NONCE
 USER_KEY = settings.AVIGILON_USER_KEY
 
-logger = logging.getLogger("avigilon-login")
+logger = get_logger("avigilon-auth")
 
 def generate_auth_token():
     epoch = int(time.time())

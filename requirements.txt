@@ -3,3 +3,4 @@ httpx
 uvicorn
 pydantic
 pydantic-settings
+apscheduler

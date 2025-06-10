@@ -1,4 +1,3 @@
-import logging
 from fastapi import APIRouter, Response, Query
 from fastapi.responses import JSONResponse
 from app.services.appearance_api import search_appearance_service, search_by_description_service
@@ -7,9 +6,10 @@ from app.services.media_api import get_media_service
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 import base64
+from app.core.logging import get_logger
 
 router = APIRouter()
-logger = logging.getLogger("avigilon-appearance-events")
+logger = get_logger("avigilon-appearance-events")
 
 class AppearanceSearchBody(BaseModel):
     from_time: Optional[str] = None
@@ -62,9 +62,10 @@ async def appearance_search_by_description(body: AppearanceSearchByDescriptionBo
         return Response(content="{}", status_code=503, media_type="application/json")
 
 @router.get("/api/all-face-events-fetch", response_class=JSONResponse)
-async def all_face_events_fetch(date: str = Query(..., description="Date in YYYY-MM-DD format")):
-    from_time = f"{date}T00:00:00.000Z"
-    to_time = f"{date}T23:59:59.999Z"
+async def all_face_events_fetch(
+    from_time: str = Query(..., description="Start time in ISO format, e.g. 2024-06-10T00:00:00.000Z"),
+    to_time: str = Query(..., description="End time in ISO format, e.g. 2024-06-10T00:00:00.000Z")
+):
     cameras_resp = await get_cameras_service()
     cameras_data = cameras_resp.json()
     camera_ids = [cam["id"] for cam in cameras_data.get("result", []).get("cameras", []) if "id" in cam]

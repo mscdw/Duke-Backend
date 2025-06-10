@@ -1,12 +1,12 @@
 import httpx
-import logging
 from app.core.config import get_settings
+from app.core.logging import get_logger
 from typing import Optional
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
 AVIGILON_BASE = settings.AVIGILON_BASE
-logger = logging.getLogger("avigilon-appearance-service")
+logger = get_logger("avigilon-appearance-service")
 
 async def search_appearance_service(
     from_time: Optional[str] = None,

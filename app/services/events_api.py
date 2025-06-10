@@ -1,11 +1,11 @@
 import httpx
-import logging
 from app.core.config import get_settings
+from app.core.logging import get_logger
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
 AVIGILON_BASE = settings.AVIGILON_BASE
-logger = logging.getLogger("avigilon-events-service")
+logger = get_logger("avigilon-events-service")
 
 async def get_active_events_service(server_id, limit):
     url = f"{AVIGILON_BASE}/events/search?session={settings.SESSION_TOKEN}&limit={limit}&serverId={server_id}&queryType=ACTIVE"

@@ -1,11 +1,11 @@
-import logging
 from typing import Optional
 from fastapi import APIRouter, Response, Query
 from app.services.events_api import get_active_events_service, search_events_service, get_continue_events_service
 from app.services.media_api import get_media_service
+from app.core.logging import get_logger
 
 router = APIRouter()
-logger = logging.getLogger("avigilon-device-events")
+logger = get_logger("avigilon-device-events")
 
 @router.get("/api/events-search", response_class=Response)
 async def events_search(

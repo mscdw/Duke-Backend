@@ -1,12 +1,12 @@
-import logging
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from app.core.logging import get_logger
 from app.services.auth import authenticate
 from app.api.endpoints import router
 from app.api.server_events import router as server_events_router
 from app.api.appearance_events import router as appearance_events_router
 
-logger = logging.getLogger("avigilon-base")
+logger = get_logger("avigilon-base")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
