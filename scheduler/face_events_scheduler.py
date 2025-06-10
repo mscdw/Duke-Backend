@@ -3,11 +3,17 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
 import base64
 from app.core.logging import get_logger
+from app.core.config import get_settings
 from app.services.avigilon_api import get_cameras_service
 from app.services.appearance_api import search_by_description_service
 from app.services.media_api import get_media_service
+import httpx
 
 logger = get_logger("face-events-scheduler")
+settings = get_settings()
+central_base = settings.CENTRAL_BASE
+verify_ssl = settings.AVIGILON_API_VERIFY_SSL
+post_url = f"{central_base}/store-appearances"
 
 def fetch_face_events():
     async def fetch_logic():
@@ -57,6 +63,10 @@ def fetch_face_events():
                     break
             total_length = len(flat_results)
             logger.info(f"Fetched {total_length} face events for {from_time} to {to_time}")
+            payload = {"total_length": total_length, "results": flat_results}
+            async with httpx.AsyncClient(verify=verify_ssl) as client:
+                response = await client.post(post_url, json=payload)
+                logger.info(f"Posted results central analytics app: {response.status_code}")
         except Exception as e:
             logger.error(f"Error fetching face events: {e}")
     asyncio.run(fetch_logic())

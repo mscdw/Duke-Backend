@@ -30,6 +30,7 @@ AVIGILON_CLIENT_NAME=your-avigilon-client-name
 AVIGILON_USER_NONCE=your-avigilon-user-nonce
 AVIGILON_USER_KEY=your-avigilon-user-key
 AVIGILON_API_VERIFY_SSL=False
+CENTRAL_BASE=https://central-analytics-url
 ```
 
 ## Setup (Local Development)
