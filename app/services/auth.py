@@ -22,9 +22,6 @@ def generate_auth_token():
     return f"{USER_NONCE}:{epoch}:{hash_output}"
 
 async def authenticate():
-    if getattr(settings, "SESSION_TOKEN", None):
-        logger.info("SESSION_TOKEN already exists, skipping authentication request")
-        return
     try:
         async with httpx.AsyncClient(verify=False, timeout=10) as client:
             response = await client.post(

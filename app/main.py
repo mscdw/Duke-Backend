@@ -6,6 +6,7 @@ from app.api.endpoints import router
 from app.api.server_events import router as server_events_router
 from app.api.appearance_events import router as appearance_events_router
 from scheduler.face_events_scheduler import start_scheduler
+from scheduler.auth_token_scheduler import start_auth_scheduler
 
 logger = get_logger("avigilon-base")
 
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
     await authenticate()
     logger.info("Authentication complete.")
     start_scheduler()
+    start_auth_scheduler()
     yield
     logger.info("Shutting down...")
 

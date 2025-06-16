@@ -1,7 +1,6 @@
 import asyncio
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta
-import base64
 from app.core.logging import get_logger
 from app.core.config import get_settings
 from app.services.appearance_api import fetch_all_face_events
