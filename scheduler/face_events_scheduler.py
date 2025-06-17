@@ -31,6 +31,6 @@ def all_face_events_fetch():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(all_face_events_fetch, 'cron', hour=1, minute=0, timezone='UTC')
+    scheduler.add_job(all_face_events_fetch, 'cron', hour=1, minute=0)
     scheduler.start()
-    logger.info("Face events scheduler started (runs daily at 01:00 UTC)")
+    logger.info("Face events scheduler started (runs daily at 01:00)")

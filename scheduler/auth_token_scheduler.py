@@ -9,7 +9,7 @@ logger = get_logger("auth-scheduler")
 def auth_token_refresh_job():
     async def refresh_logic():
         try:
-            logger.info(f"Refreshing Avigilon API session token at {datetime.now().isoformat()} UTC...")
+            logger.info(f"Refreshing Avigilon API session token at {datetime.now().isoformat()}...")
             await authenticate()
             logger.info("Session token refreshed successfully.")
         except Exception as e:
@@ -18,6 +18,6 @@ def auth_token_refresh_job():
 
 def start_auth_scheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(auth_token_refresh_job, 'cron', minute=0, timezone='UTC')
+    scheduler.add_job(auth_token_refresh_job, 'cron', minute=0)
     scheduler.start()
-    logger.info("Auth token refresh scheduler started (runs every hour at minute 0 UTC)")
+    logger.info("Auth token refresh scheduler started (runs every hour at minute 0)")
