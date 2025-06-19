@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 from app.services.appearance_api import search_appearance_service, search_by_description_service, fetch_all_face_events
 from pydantic import BaseModel
 from typing import Optional, List, Dict
-import base64
 from app.core.logging import get_logger
 
 router = APIRouter()

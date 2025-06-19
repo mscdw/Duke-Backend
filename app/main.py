@@ -5,8 +5,8 @@ from app.services.auth import authenticate
 from app.api.endpoints import router
 from app.api.server_events import router as server_events_router
 from app.api.appearance_events import router as appearance_events_router
-from scheduler.face_events_scheduler import start_scheduler
-from scheduler.auth_token_scheduler import start_auth_scheduler
+from app.scheduler.face_events_scheduler import start_scheduler
+from app.scheduler.auth_token_scheduler import start_auth_scheduler
 
 logger = get_logger("avigilon-base")
 
