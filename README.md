@@ -96,4 +96,25 @@ CENTRAL_BASE=https://central-analytics-url
 
 ---
 
-For questions or contributions, please contact the project maintainer.
+## Duke Backend Service Setup (NSSM)
+
+Use [NSSM](https://nssm.cc) to run Duke Central as Windows services:
+
+* **Service Name**: `DukeFarmingBackend`
+* **Path**: `C:\path\to\venv\Scripts\python.exe`
+* **Startup Dir**: `C:\path\to\Duke-Backend`
+* **Arguments**:
+
+  ```
+  -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+  ```
+
+### Manage Services
+
+```bash
+
+net stop DukeFarmingBackend
+net start DukeFarmingBackend
+```
+
+---
