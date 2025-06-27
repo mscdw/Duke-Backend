@@ -22,7 +22,7 @@ def all_face_events_fetch():
             logger.info(f"Fetching face events from {from_time} to {to_time} at {now}...")
             payload = await fetch_all_face_events(from_time, to_time)
             logger.info(f"Fetched {payload['total_length']} face events for {from_time} to {to_time}")
-            async with httpx.AsyncClient(verify=verify_ssl) as client:
+            async with httpx.AsyncClient(verify=verify_ssl, timeout=600) as client:
                 response = await client.post(post_url, json=payload)
                 logger.info(f"Posted results central analytics app: {response.status_code}")
         except Exception as e:
@@ -31,6 +31,6 @@ def all_face_events_fetch():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(all_face_events_fetch, 'cron', hour=1, minute=0)
+    scheduler.add_job(all_face_events_fetch, 'cron', hour=0, minute=30, misfire_grace_time=60)
     scheduler.start()
-    logger.info("Face events scheduler started (runs daily at 01:00)")
+    logger.info("Face events scheduler started (runs daily at 12:30am)")
