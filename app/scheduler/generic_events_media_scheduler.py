@@ -24,29 +24,56 @@ UPDATE_EVENTS_MEDIA_URL = f"{central_base_url.rstrip('/')}/events/media"
 
 # --- Configuration ---
 TARGET_EVENT_TYPE = "DEVICE_CLASSIFIED_OBJECT_MOTION_START"
-BATCH_SIZE = 50  # How many events to fetch and process in a single batch.
-IMAGE_FORMAT = "jpeg"
+BATCH_SIZE = 1  # How many events to fetch and process in a single batch.
 
 
 async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Fetches media for a single event and returns an update payload."""
-    event_id = event.get("id")
+    """Fetches both JSON and JPEG media for a single event and returns a combined update payload."""
+    event_id = event.get("_id")
     camera_id = event.get("cameraId")
-    timestamp = event.get("eventStartTime")
+    timestamp = event.get("timestamp")
 
     if not all([event_id, camera_id, timestamp]):
         logger.warning(f"Skipping event due to missing data needed for media fetch: {event}")
         return None
 
-    media_resp = await get_media_service(camera_id, timestamp, IMAGE_FORMAT)
-    if media_resp and media_resp.status_code == 200:
-        image_base64 = base64.b64encode(media_resp.content).decode("utf-8")
-        return {"eventId": event_id, "imageBaseString": image_base64}
+    update_payload = {"eventId": event_id}
+    
+    # Concurrently fetch JSON and JPEG media to improve performance
+    json_task = get_media_service(camera_id, timestamp, "json")
+    jpeg_task = get_media_service(camera_id, timestamp, "jpeg")
 
-    logger.warning(
-        f"Failed to fetch media for event {event_id} (camera {camera_id} at {timestamp}). "
-        f"Status: {media_resp.status_code if media_resp else 'N/A'}"
-    )
+    # return_exceptions=True prevents one failed request from stopping the others.
+    results = await asyncio.gather(json_task, jpeg_task, return_exceptions=True)
+    json_media_resp, jpeg_media_resp = results
+
+    # Process JSON media response
+    if isinstance(json_media_resp, httpx.Response) and json_media_resp.status_code == 200:
+        # UPDATED: Store the response body as raw text, as it may not be strict JSON.
+        # This prevents parsing errors and stores the data as-is.
+        update_payload["json"] = json_media_resp.text
+    else:
+        # Log either the failed response status or the exception that occurred.
+        reason = json_media_resp if isinstance(json_media_resp, Exception) else getattr(json_media_resp, 'status_code', 'N/A')
+        logger.warning(
+            f"Failed to fetch JSON media for event {event_id}. Reason: {reason}"
+        )
+
+    # Process JPEG media response
+    if isinstance(jpeg_media_resp, httpx.Response) and jpeg_media_resp.status_code == 200:
+        update_payload["imageBaseString"] = base64.b64encode(jpeg_media_resp.content).decode("utf-8")
+    else:
+        # Log either the failed response status or the exception that occurred.
+        reason = jpeg_media_resp if isinstance(jpeg_media_resp, Exception) else getattr(jpeg_media_resp, 'status_code', 'N/A')
+        logger.warning(
+            f"Failed to fetch JPEG media for event {event_id}. Reason: {reason}"
+        )
+
+    # Only return a payload if at least one media type was successfully fetched
+    if "json" in update_payload or "imageBaseString" in update_payload:
+        return update_payload
+
+    logger.error(f"Failed to fetch any media for event {event_id}.")
     return None
 
 
@@ -56,7 +83,10 @@ async def enrich_events_job_logic():
     total_enriched_count = 0
 
     try:
-        async with httpx.AsyncClient(verify=verify_ssl, timeout=300) as client:
+        # Use more granular timeouts: 10s to connect, 60s to read the response.
+        # This helps fail faster if the service is unreachable.
+        timeout_config = httpx.Timeout(10.0, read=60.0)
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=timeout_config) as client:
             while True:
                 # 1. Fetch a batch of events that need enrichment from your central app
                 logger.info(f"Fetching a batch of up to {BATCH_SIZE} events to enrich...")
@@ -66,7 +96,9 @@ async def enrich_events_job_logic():
                     resp.raise_for_status()
                     events_to_process = resp.json().get("events", [])
                 except httpx.RequestError as e:
-                    logger.error(f"Could not connect to central app at {EVENTS_FOR_ENRICHMENT_URL}: {e}")
+                    logger.error(
+                        f"Could not connect to central app at {EVENTS_FOR_ENRICHMENT_URL}. Please check network connectivity.",
+                        exc_info=True)
                     break
                 except httpx.HTTPStatusError as e:
                     logger.error(f"Failed to fetch events for enrichment: {e.response.status_code} - {e.response.text}")
@@ -89,6 +121,8 @@ async def enrich_events_job_logic():
                     else: continue
 
                 # 3. Post the batch of updates back to the central application
+                # logger.info("Update payloads: %s", valid_updates)
+
                 logger.info(f"Posting {len(valid_updates)} media updates back to the central app...")
                 try:
                     update_resp = await client.post(UPDATE_EVENTS_MEDIA_URL, json={"updates": valid_updates})
@@ -117,7 +151,14 @@ def generic_events_media_enrichment_job():
 def start_generic_events_media_scheduler():
     """Starts the background scheduler for the media enrichment job."""
     scheduler = BackgroundScheduler(timezone="UTC")
-    # Runs every hour at 10 minutes past the hour, giving the main ingestion job time to complete.
-    scheduler.add_job(generic_events_media_enrichment_job, 'cron', minute=10, misfire_grace_time=300)
+    # Runs daily at a specific time (e.g., 2:15 AM UTC).
+    scheduler.add_job(
+        generic_events_media_enrichment_job,
+        'cron',
+        hour=2,
+        minute=15,
+        next_run_time=datetime.now(timezone.utc),
+        misfire_grace_time=300
+    )
     scheduler.start()
-    logger.info("Generic events media enrichment scheduler started (runs hourly at xx:10).")
+    logger.info("Generic events media enrichment scheduler started (runs daily at 02:15 UTC).")

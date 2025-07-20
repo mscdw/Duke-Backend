@@ -111,7 +111,7 @@ def start_generic_events_scheduler():
     scheduler.add_job(
         generic_events_fetch_job,
         "interval",
-        minutes=60,
+        minutes=1440,
         next_run_time=datetime.now(timezone.utc),
         misfire_grace_time=300,  # Increased grace time for longer-running jobs
     )
