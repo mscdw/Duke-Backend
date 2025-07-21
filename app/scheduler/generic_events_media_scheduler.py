@@ -24,7 +24,7 @@ UPDATE_EVENTS_MEDIA_URL = f"{central_base_url.rstrip('/')}/events/media"
 
 # --- Configuration ---
 TARGET_EVENT_TYPE = "DEVICE_CLASSIFIED_OBJECT_MOTION_START"
-BATCH_SIZE = 1  # How many events to fetch and process in a single batch.
+BATCH_SIZE = 10  # How many events to fetch and process in a single batch.
 
 
 async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -154,11 +154,11 @@ def start_generic_events_media_scheduler():
     # Runs daily at a specific time (e.g., 2:15 AM UTC).
     scheduler.add_job(
         generic_events_media_enrichment_job,
-        'cron',
-        hour=2,
-        minute=15,
+        "interval",
+        hours=1, # Run every hour to catch up on "today's" data.
         next_run_time=datetime.now(timezone.utc),
-        misfire_grace_time=300
+        misfire_grace_time=600, # 10 minutes
     )
     scheduler.start()
     logger.info("Generic events media enrichment scheduler started (runs daily at 02:15 UTC).")
+    # pass
