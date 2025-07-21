@@ -112,7 +112,7 @@ def run_async_facial_recognition_job():
 
 
 def start_event_facial_recognition_scheduler():
-    """Initializes and starts the background scheduler."""
+    # """Initializes and starts the background scheduler."""
     scheduler = BackgroundScheduler(timezone="UTC")
     scheduler.add_job(
         run_async_facial_recognition_job,  # Point the scheduler to our new synchronous wrapper
@@ -123,3 +123,4 @@ def start_event_facial_recognition_scheduler():
     )
     scheduler.start()
     logger.info("Event facial recognition scheduler started (runs every day).")
+    pass
