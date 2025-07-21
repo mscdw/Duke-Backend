@@ -149,17 +149,16 @@ def generic_events_media_enrichment_job():
 
 
 def start_generic_events_media_scheduler():
-    # """Starts the background scheduler for the media enrichment job."""
-    # scheduler = BackgroundScheduler(timezone="UTC")
-    # # Runs daily at a specific time (e.g., 2:15 AM UTC).
-    # scheduler.add_job(
-    #     generic_events_media_enrichment_job,
-    #     'cron',
-    #     hour=2,
-    #     minute=15,
-    #     next_run_time=datetime.now(timezone.utc),
-    #     misfire_grace_time=300
-    # )
-    # scheduler.start()
-    # logger.info("Generic events media enrichment scheduler started (runs daily at 02:15 UTC).")
-    pass
+    """Starts the background scheduler for the media enrichment job."""
+    scheduler = BackgroundScheduler(timezone="UTC")
+    # Runs daily at a specific time (e.g., 2:15 AM UTC).
+    scheduler.add_job(
+        generic_events_media_enrichment_job,
+        "interval",
+        hours=1, # Run every hour to catch up on "today's" data.
+        next_run_time=datetime.now(timezone.utc),
+        misfire_grace_time=600, # 10 minutes
+    )
+    scheduler.start()
+    logger.info("Generic events media enrichment scheduler started (runs daily at 02:15 UTC).")
+    # pass
