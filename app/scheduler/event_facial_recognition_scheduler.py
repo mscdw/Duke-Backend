@@ -32,9 +32,7 @@ async def process_events_for_facial_recognition_job():
         # It's good practice to set base_url on the client
         async with httpx.AsyncClient(base_url=central_base_url, verify=verify_ssl, timeout=120) as client:
             
-            # <<< CHANGE: Start a loop to process records in batches >>>
             while True:
-                # This list must be cleared for each new batch
                 updates_to_send: List[Dict[str, Any]] = []
 
                 # 1. Fetch a batch of events that need processing
@@ -44,7 +42,6 @@ async def process_events_for_facial_recognition_job():
                 data = fetch_response.json()
                 events_to_process = data.get("events", [])
 
-                # <<< CHANGE: This is now the exit condition for the loop >>>
                 if not events_to_process:
                     logger.info("No new events found. The job has processed all available records.")
                     break  # Exit the while loop
@@ -64,51 +61,68 @@ async def process_events_for_facial_recognition_job():
 
                     try:
                         image_bytes = base64.b64decode(image_b64)
-
                         processing_result = process_face_search_and_index(image_bytes)
-                        status = processing_result.get("status")
+                        status = processing_result["status"] # Use direct access, as 'status' is guaranteed
                         face_info = processing_result.get("face_info")
 
+                        # +++ REFACTORED AND CORRECTED LOGIC +++
+                        
+                        # Step 1: Initialize the payload with guaranteed values.
+                        # This ensures 'match_result' is ALWAYS present.
                         face_processing_payload = {
                             "processed": True,
                             "processed_at": datetime.now(timezone.utc).isoformat(),
-                            "new_face_indexed": False
+                            "match_result": status, # Directly assign the status
+                            "new_face_indexed": status == "indexed",
+                            "error_message": processing_result.get("error_message")
                         }
 
+                        # Step 2: Create the base update payload.
                         update_payload = {
                             "eventId": event_id,
                             "personId": None,
                             "personFace": None,
                             "face_processing": face_processing_payload
                         }
+                        
+                        # Step 3: Handle specific cases to add optional data.
 
-                        if status == "matched":
-                            face_processing_payload["match_result"] = "matched"
-                            update_payload["personId"] = face_info.FaceId
-                            update_payload["personFace"] = face_info.model_dump()
-                            logger.info(f"Prepared update for event {event_id} with personId {face_info.FaceId} (match_result: matched)")
-                        elif status == "indexed":
-                            face_processing_payload["match_result"] = "indexed"
-                            face_processing_payload["new_face_indexed"] = True
-                            update_payload["personId"] = face_info.FaceId
-                            update_payload["personFace"] = face_info.model_dump()
-                            logger.info(f"Prepared update for event {event_id} with new personId {face_info.FaceId} (match_result: indexed)")
+                        if status in ["matched", "indexed"]:
+                            if face_info: # Good practice to check if face_info exists
+                                update_payload["personId"] = face_info.FaceId
+                                update_payload["personFace"] = face_info.model_dump()
+                                logger.info(f"Prepared update for event {event_id} with personId {face_info.FaceId} (match_result: {status})")
+                            else:
+                                # This is a safeguard for an unexpected state
+                                logger.error(f"Event {event_id} had status '{status}' but no face_info was returned.")
+                                face_processing_payload["match_result"] = "error"
+                                face_processing_payload["error_message"] = f"Inconsistent state: status is '{status}' but face_info is missing."
+
+                        elif status == "low_quality_face":
+                            # This is the new case you were missing!
+                            # Extract rejection reasons if your AWS function provides them.
+                            # (Assuming process_face_search_and_index is updated to return this.)
+                            reasons = processing_result.get("rejection_reasons")
+                            if reasons:
+                                face_processing_payload["rejection_reasons"] = reasons
+                            logger.warning(f"Low quality face for event {event_id}. Reasons: {reasons} (match_result: {status})")
+
                         elif status == "no_face":
-                            face_processing_payload["match_result"] = "no_face"
-                            logger.warning(f"No face detected for event {event_id}. (match_result: no_face)")
+                            logger.warning(f"No face detected for event {event_id}. (match_result: {status})")
+                        
                         elif status == "error":
-                            face_processing_payload["match_result"] = "error"
-                            face_processing_payload["error_message"] = processing_result.get("error_message", "Unknown error")
-                            logger.error(f"Error processing event {event_id}. (match_result: error)")
+                            logger.error(f"Error processing event {event_id}. Message: {face_processing_payload['error_message']} (match_result: {status})")
+                        
+                        # +++ END OF REFACTORED LOGIC +++
 
                         updates_to_send.append(update_payload)
 
                     except Exception as e:
-                        logger.error(f"Error processing image for event {event_id}: ", exc_info=True)
+                        logger.error(f"Critical error pre-processing image for event {event_id}: ", exc_info=True)
                         face_processing_payload = {
                             "processed": True, "processed_at": datetime.now(timezone.utc).isoformat(),
                             "match_result": "error", "new_face_indexed": False,
-                            "error_message": f"Error in scheduler before Rekognition call: {str(e)}"
+                            "error_message": f"Scheduler-side error: {str(e)}"
                         }
                         updates_to_send.append({"eventId": event_id, "personId": None, "personFace": None, "face_processing": face_processing_payload})
 
@@ -116,6 +130,9 @@ async def process_events_for_facial_recognition_job():
                 if updates_to_send:
                     logger.info(f"Sending {len(updates_to_send)} facial recognition updates to central for this batch.")
                     update_response = await client.post(update_url, json={"updates": updates_to_send})
+                    # This will now print the detailed 422 error if it happens again
+                    if update_response.status_code >= 400:
+                         logger.error(f"HTTP Error {update_response.status_code} posting updates. Response: {update_response.text}")
                     update_response.raise_for_status()
                     logger.info(f"Successfully posted updates for batch. Response: {update_response.json()}")
 
