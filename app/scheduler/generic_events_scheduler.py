@@ -197,7 +197,7 @@ def start_event_schedulers():
     scheduler.add_job(
         generic_events_fetch_job,
         "interval",
-        hours=1,
+        minutes=1,
         next_run_time=datetime.now(timezone.utc) + timedelta(seconds=10),
         misfire_grace_time=600,
         id="generic_events_job"
@@ -209,7 +209,7 @@ def start_event_schedulers():
     scheduler.add_job(
         face_events_fetch_job,
         'interval',  # Use 'interval' for fast backfilling. Change to 'cron' for normal operation.
-        minutes=5,   # Run every 5 minutes.
+        minutes=1,   # Run every 5 minutes.
         # cron schedule for normal operation (once caught up):
         # 'cron',
         # hour=0,
