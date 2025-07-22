@@ -89,3 +89,10 @@ This system is composed of two distinct Windows services that must run on the sa
 *   **Operational Notes**:
     *   This service provides the user-facing web dashboard.
     *   If the UI is unresponsive or shows errors, verify that the `DukeCentralBackend` service is running and accessible.
+
+### 4. Ancillary Developer Tools
+
+In addition to the production services detailed above, a development tool named `Duke-Frontend` exists within the project ecosystem.
+
+*   **Purpose**: This is an exploratory user interface used by developers to manually interact with the `Duke-Backend` service. It helps them test API endpoints and understand data from the Avigilon system during the development cycle.
+*   **Status**: **This tool is strictly for development and is not part of the production environment.** It is run on-demand on developer workstations and does not require installation, monitoring, or support as part of the production infrastructure. It should not be confused with the production `Duke-Central Frontend` UI. 
