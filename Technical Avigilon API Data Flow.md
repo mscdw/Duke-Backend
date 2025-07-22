@@ -68,8 +68,8 @@ This flow is designed to capture a high volume of events by monitoring device mo
         Avigilon Appearance API-->>Scheduler (Motion): Returns appearance data
     end
 
-    Scheduler (Motion)->>Duke-Central: POST /events/motion (Send motion events)
-    Scheduler (Motion)->>Duke-Central: POST /events/appearance (Send appearance data)
+    Scheduler (Motion)->>Duke-Central: POST /events/store-events (Set motion events to type DEVICE_CLASSIFIED_OBJECT_MOTION_START)
+    Scheduler (Motion)->>Duke-Central: POST /events/store-events (Set appearance data to type CUSTOM_APPEARANCE)
 
     Duke-Central->>MongoDB: Insert documents into 'events' collection
     MongoDB-->>Duke-Central: Confirm writes
