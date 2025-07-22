@@ -28,7 +28,10 @@ BATCH_SIZE = 10  # How many events to fetch and process in a single batch.
 
 
 async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Fetches both JSON and JPEG media for a single event and returns a combined update payload."""
+    """
+    Fetches JPEG media for a single event and returns an update payload.
+    JSON fetching is temporarily commented out.
+    """
     event_id = event.get("_id")
     camera_id = event.get("cameraId")
     timestamp = event.get("timestamp")
@@ -39,25 +42,30 @@ async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, A
 
     update_payload = {"eventId": event_id}
     
-    # Concurrently fetch JSON and JPEG media to improve performance
-    json_task = get_media_service(camera_id, timestamp, "json")
+    # --- JSON Fetching (Commented Out) ---
+    # To re-enable, uncomment the task creation and add it to asyncio.gather below.
+    # json_task = get_media_service(camera_id, timestamp, "json")
+    
+    # Fetch JPEG media
     jpeg_task = get_media_service(camera_id, timestamp, "jpeg")
 
     # return_exceptions=True prevents one failed request from stopping the others.
-    results = await asyncio.gather(json_task, jpeg_task, return_exceptions=True)
-    json_media_resp, jpeg_media_resp = results
+    # When re-enabling JSON, the gather call should be:
+    # results = await asyncio.gather(json_task, jpeg_task, return_exceptions=True)
+    # json_media_resp, jpeg_media_resp = results
+    results = await asyncio.gather(jpeg_task, return_exceptions=True)
+    jpeg_media_resp = results[0] # Get the first (and only) result from the list.
 
-    # Process JSON media response
-    if isinstance(json_media_resp, httpx.Response) and json_media_resp.status_code == 200:
-        # UPDATED: Store the response body as raw text, as it may not be strict JSON.
-        # This prevents parsing errors and stores the data as-is.
-        update_payload["json"] = json_media_resp.text
-    else:
-        # Log either the failed response status or the exception that occurred.
-        reason = json_media_resp if isinstance(json_media_resp, Exception) else getattr(json_media_resp, 'status_code', 'N/A')
-        logger.warning(
-            f"Failed to fetch JSON media for event {event_id}. Reason: {reason}"
-        )
+    # --- Process JSON media response (Commented Out) ---
+    # if isinstance(json_media_resp, httpx.Response) and json_media_resp.status_code == 200:
+    #     # Store the response body as raw text, as it may not be strict JSON.
+    #     update_payload["json"] = json_media_resp.text
+    # else:
+    #     # Log either the failed response status or the exception that occurred.
+    #     reason = json_media_resp if isinstance(json_media_resp, Exception) else getattr(json_media_resp, 'status_code', 'N/A')
+    #     logger.warning(
+    #         f"Failed to fetch JSON media for event {event_id}. Reason: {reason}"
+    #     )
 
     # Process JPEG media response
     if isinstance(jpeg_media_resp, httpx.Response) and jpeg_media_resp.status_code == 200:
@@ -69,8 +77,8 @@ async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, A
             f"Failed to fetch JPEG media for event {event_id}. Reason: {reason}"
         )
 
-    # Only return a payload if at least one media type was successfully fetched
-    if "json" in update_payload or "imageBaseString" in update_payload:
+    # Only return a payload if the image was successfully fetched
+    if "imageBaseString" in update_payload:
         return update_payload
 
     logger.error(f"Failed to fetch any media for event {event_id}.")
@@ -146,6 +154,7 @@ async def enrich_events_job_logic():
 def generic_events_media_enrichment_job():
     """Synchronous wrapper for APScheduler."""
     asyncio.run(enrich_events_job_logic())
+    # pass
 
 
 def start_generic_events_media_scheduler():
