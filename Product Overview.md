@@ -33,7 +33,7 @@ The `Duke-Backend` service uses a hybrid strategy to pull data from Avigilon. It
 
 All captured data is forwarded to `Duke-Central`, which stores it in different MongoDB collections based on the source.
 
-> For a detailed explanation of this hybrid strategy, see the **Technical Avigilon API Data Flow**.
+> For a detailed explanation of this hybrid strategy, see [Technical Avigilon API Data Flow](Technical%20Avigilon%20API%20Data%20Flow.md).
 
 ### Phase 2: Processing - Facial Recognition
 
@@ -44,7 +44,7 @@ A separate scheduled job within `Duke-Backend` runs periodically to process even
 3.  The recognition results (e.g., `FaceId`, `status: matched`) are collected.
 4.  The results are sent back to `Duke-Central` in a batch to update the event records in MongoDB.
 
-> The complete sequence, including API calls and interactions, is detailed in the **Technical Integration Guide**.
+> The complete sequence, including API calls and interactions, is detailed in the [Technical Integration Guide](Technical%20Integration%20Guide.md).
 
 ### Phase 3: Visualization - User Interaction
 
@@ -57,10 +57,10 @@ The Duke System is built primarily with Python, using FastAPI for the backend AP
 For more specific information, please consult the following documents:
 
 *   **For End-to-End Data Flow**:
-    *   Technical Integration Guide.md - Details the entire lifecycle from ingestion to final storage after recognition.
+    *   [Technical Integration Guide](Technical%20Integration%20Guide.md) - Details the entire lifecycle from ingestion to final storage after recognition.
 *   **For Data Ingestion Details**:
-    *   Technical Avigilon API Data Flow.md - Explains the hybrid polling strategy for Avigilon APIs.
+    *   [Technical Avigilon API Data Flow](Technical%20Avigilon%20API%20Data%20Flow.md) - Explains the hybrid polling strategy for Avigilon APIs.
 *   **For IT and Operations**:
-    *   Technical Overview.md - Provides infrastructure, deployment, and service configuration details for IT support.
+    *   [Technical Overview](Technical%20Overview.md) - Provides infrastructure, deployment, and service configuration details for IT support.
 *   **For Developers**:
-    *   Duke-Frontend/Technical Overview.md - Describes the purpose and usage of the developer-facing testing tool.
+    *   [Duke-Frontend/Technical Overview](https://github.com/mscdw/Duke-frontend/blob/main/Technical%20Overview.md) - Describes the purpose and usage of the developer-facing testing tool.
