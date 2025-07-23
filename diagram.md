@@ -5,7 +5,7 @@
 - The Hub stores all raw data, curated identities, and final anomaly reports in the database.
 - Enable Threat Analysts to consume the final intelligence via the Hub's UI.
 
-## Phase 2 Enhancements (TODO)
+### Phase 2 Enhancements (TODO)
 
 - **Person Identity Management UI:** Interface within the Hub for analysts to merge, unmerge, and curate person identities in the re-identification collection.
 - **Rules Engine Management UI:** Allow analysts to create, edit, and manage deterministic rules via the Hub interface.
@@ -14,7 +14,7 @@
 
 ---
 
-## Diagram
+### Diagram
 
 ```mermaid
 %%{init: { 'theme': 'neutral' }}%%
