@@ -19,7 +19,7 @@
 ```mermaid
 %%{init: { 'theme': 'neutral' }}%%
 graph LR
-    %% Define External User
+    %% External User
     human_analyst["fa:fa-user-shield Threat Analyst (User)"]
 
     %% On-Premise Substations
@@ -41,14 +41,13 @@ graph LR
         
         subgraph "EC2 or EKS Compute"
             direction TB
-            collector["fa:fa-clock Collector"]
+            collector["fa:fa-clock<br>Collector"]
             hub["fa:fa-window-maximize Hub (API & UI)"]
             threat_intel_engine["fa:fa-microchip Threat Intel Engine<br>(Rules, ML Models,<br>Optional GenAI)"]
         end
 
-        %% Rekognition shown with its internal collection
         subgraph "fa:fa-search AWS Rekognition"
-             rekognition_collection["fa:fa-id-badge Face Collection<br>(for Re-ID)"]
+            rekognition_collection["fa:fa-id-badge Face Collection<br>(for Re-ID)"]
         end
 
         subgraph "MongoDB-Compatible (DocumentDB)"
@@ -65,7 +64,7 @@ graph LR
         end
     end
 
-    %% --- Data Flow & Connections ---
+    %% Data Flow & Connections
 
     %% On-Prem to Cloud
     avigilon1a -- "Poll for Appearances,<br>Events, Media" --> collector
@@ -79,10 +78,8 @@ graph LR
     hub -- "Stores Raw Data" --> appearances_events
     hub -- "Stores AI/ML Results" --> anomaly_reports
     hub <--> |"Manages Curated Identities"| persons_collection
-    
-    %% Simplified interaction with the unified Threat Intel Engine
     hub <--> |"GET Events / POST Anomalies"| threat_intel_engine
-    
-    %% User Interaction (Routed through RBAC & Hub)
+
+    %% User Interaction
     human_analyst -- "All UI/API Requests<br>(View, Curate, Manage Rules)" --> rbac
     rbac -- "Authenticated & Authorized Requests" --> hub
