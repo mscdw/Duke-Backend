@@ -14,7 +14,7 @@
 
 ---
 
-### Diagram
+### System Diagram
 
 ```mermaid
 %%{init: { 'theme': 'neutral' }}%%
