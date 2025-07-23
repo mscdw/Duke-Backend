@@ -1,4 +1,4 @@
-#### The system must:
+## Overview
 - Use a Collector to interact with AWS Rekognition, indexing and searching against its internal Face Collection to achieve person re-identification.
 - Use a Hub to broker all data flow, sending events to a unified Threat Intel Engine.
 - The Threat Intel Engine—a single logical service composed of rules, ML, and optional GenAI—processes this data and returns complete Anomaly Reports to the Hub.
