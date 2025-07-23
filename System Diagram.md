@@ -74,8 +74,8 @@ graph LR
 
     %% Internal Cloud Flow
     collector -- "Face Search<br>& Index" --> rekognition_collection
-    collector -- "POST<br>Enriched Data" --> hub
-    hub -- "Stores Raw Data" --> appearances_events
+    collector -- "POST Raw &<br>Enriched Data" --> hub
+    hub -- "Stores Raw<br>& Enriched Data" --> appearances_events
     hub -- "Stores AI/ML<br>Results" --> anomaly_reports
     hub <--> |"Manages<br>Curated Identities"| persons_collection
     hub <--> |"GET Events /<br>POST Anomalies"| threat_intel_engine
