@@ -1,16 +1,3 @@
-%% Phase 2 Enhancements (TODO)
-%% - Person Identity Management UI: Interface within the Hub for analysts to merge, unmerge, and curate person identities in the re-identification collection.
-%% - Rules Engine Management UI: Allow analysts to create, edit, and manage deterministic rules via the Hub interface.
-%% - Collector Management UI: A section in the Hub to register new collectors, monitor their status, and manage site configurations.
-%% - Enterprise Authentication Integration: Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
-
-%% System Responsibilities
-%% - Use a Collector to interact with AWS Rekognition, indexing and searching against its internal Face Collection to achieve person re-identification.
-%% - Use a Hub to broker all data flow, sending events to a unified Threat Intel Engine.
-%% - The Threat Intel Engine—a single logical service composed of rules, ML, and optional GenAI—processes this data and returns complete Anomaly Reports to the Hub.
-%% - The Hub stores all raw data, curated identities, and final anomaly reports in the database.
-%% - Enable Threat Analysts to consume the final intelligence via the Hub's UI.
-
 graph LR
 
     human_analyst["Threat Analyst (User)"]
