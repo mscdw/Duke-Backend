@@ -6,13 +6,15 @@
 
 ### Phase 2 Enhancements (TODO)
 
+- **Enterprise Authentication Integration:** Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
 - **Dedicated Image Storage:** Store images in an AWS S3 bucket instead of MongoDB for cost-effective and scalable storage.
-- **Scalability with Message Queues:** Refactor internal data flow to use a message queue (e.g., SQS) for horizontal scaling beyond two sites.
 - **Person Identity Management UI:** Interface within the Hub for analysts to merge, unmerge, and curate person identities in the re-identification collection.
 - **Rules Engine Management UI:** Allow analysts to create, edit, and manage deterministic rules via the Hub interface.
-- **Collector Management UI:** A section in the Hub to register new collectors, monitor their status, and manage site configurations.
-- **Enterprise Authentication Integration:** Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
 
+### Post–Phase 2 PoV (Scaling Beyond 2 Sites)
+
+- **Collector Management UI:** A section in the Hub to register new collectors, monitor their status, and manage site configurations.
+- **Scalability with Message Queues:** Refactor the internal data flow to use a message queue (e.g., Amazon SQS) to enable horizontal scaling beyond two sites. This decouples data ingestion from processing, improving reliability and throughput under load. Estimated effort: **1–2 weeks**.
 ---
 
 ### System Diagram
@@ -51,14 +53,18 @@ graph LR
     end
 
     subgraph "Managed Services"
-        direction TB
-        sqs["fa:fa-exchange-alt<br>Message Queue<br>(Future Scaling)"]
         rekognition_collection["fa:fa-id-badge<br>Rekognition<br>Face Collection"]
     end
 
     subgraph "Storage"
+        direction TB
         s3_bucket["fa:fa-archive<br>S3 Bucket<br>(Image Store)"]
-        db["fa:fa-database<br>DocumentDB<br>(Metadata, Reports)"]
+        subgraph "fa:fa-database DocumentDB"
+            persons_coll["fa:fa-users<br>Collection: Persons"]
+            events_coll["fa:fa-file-alt<br>Collection: Events"]
+            reports_coll["fa:fa-flag<br>Collection: Reports"]
+            rules_coll["fa:fa-list-alt<br>Collection: Rules"]
+        end
     end
      
     subgraph "Security & Operations"
@@ -77,25 +83,29 @@ graph LR
   avigilon2 -- "HTTPS Poll" --> vpn
   vpn -- "Secure Tunnel" --> collector
 
-  %% Internal Cloud Flow
-  collector -- "POST Events<br>(PoV Flow)" --> hub
-  collector -. "Future Scaling Flow" .-> sqs
-  sqs -.-> hub
+  %% Core Data Flow
   collector -- "Gets Credentials" --> secrets_manager
   collector -- "Uploads Images" --> s3_bucket
   collector -- "Face Search/Index" --> rekognition_collection
-  hub -- "Writes Metadata<br>& S3 Links" --> db
-  threat_intel_engine <--> |"Reads Events,<br>Writes Reports"| db
-  hub -- "Generates<br>Pre-signed URLs" --> s3_bucket
+  collector -- "POST Metadata" --> hub
+  hub -- "Writes to" --> events_coll
   
-  %% User Interaction
+  %% Analysis Flow
+  threat_intel_engine -- "Reads" --> events_coll
+  threat_intel_engine -- "Reads" --> rules_coll
+  threat_intel_engine -- "Writes to" --> reports_coll
+  
+  %% User Interaction & Management
   human_analyst -- "UI/API Requests" --> rbac
-  rbac -- "Authorized<br>Requests" --> hub
+  rbac -- "Authorized Requests" --> hub
+  hub -- "Reads Reports/Events" --> reports_coll
+  hub -- "Reads Reports/Events" --> events_coll
+  hub -- "|Manages Identities<br>(Merge/Unmerge)|" --> persons_coll
+  hub -- "|Manages Rules|" --> rules_coll
+  hub -- "Generates<br>Pre-signed URLs" --> s3_bucket
 
   %% Operations Flow
-  collector -- "Logs" --> cloudwatch
-  hub -- "Logs" --> cloudwatch
-  threat_intel_engine -- "Logs" --> cloudwatch
+  collector & hub & threat_intel_engine -- "Logs" --> cloudwatch
 ```
 
 ### System Architecture & IT Integration FAQ
