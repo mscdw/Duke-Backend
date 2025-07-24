@@ -1,21 +1,18 @@
 ## Overview
-- Use a Collector to interact with AWS Rekognition, indexing and searching against its internal Face Collection to achieve person re-identification.
-- Use a Hub to broker all data flow, sending events to a unified Threat Intel Engine.
-- The Threat Intel Engine—a single logical service composed of rules, ML, and optional GenAI—processes this data and returns complete Anomaly Reports to the Hub.
-- The Hub stores all raw data, curated identities, and final anomaly reports in the database.
-- Enable Threat Analysts to consume the final intelligence via the Hub's UI.
+- **Ingestion & Enrichment:** A Collector polls Avigilon for event data, uploads the associated image directly to S3, and enriches the event metadata with a face signature from AWS Rekognition.
+- **Persistence for Analysis:** A central Hub receives the complete metadata package (including the S3 image link and Rekognition results) from the Collector and persists it to the database, staging the data for the analysis engine.
+- **Batch Analysis & Reporting:** The Threat Intel Engine operates as an independent batch process. It periodically queries the database for new events, performs its analysis, and writes the resulting Anomaly Reports directly back to the database.
+- **Consumption:** Finally, the Hub's UI provides a unified view, allowing Threat Analysts to consume the raw events, curated identities, and final Anomaly Reports from the database.
 
 ### Phase 2 Enhancements (TODO)
 
-- **Enterprise Authentication Integration:** Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
 - **Dedicated Image Storage:** Store images in an AWS S3 bucket instead of MongoDB for cost-effective and scalable storage.
+- **Scalability with Message Queues:** Refactor internal data flow to use a message queue (e.g., SQS) for horizontal scaling beyond two sites.
 - **Person Identity Management UI:** Interface within the Hub for analysts to merge, unmerge, and curate person identities in the re-identification collection.
 - **Rules Engine Management UI:** Allow analysts to create, edit, and manage deterministic rules via the Hub interface.
-
-### Post–Phase 2 PoV (Scaling Beyond 2 Sites)
-
 - **Collector Management UI:** A section in the Hub to register new collectors, monitor their status, and manage site configurations.
-- **Scalability with Message Queues:** Refactor the internal data flow to use a message queue (e.g., Amazon SQS) to enable horizontal scaling beyond two sites. This decouples data ingestion from processing, improving reliability and throughput under load. Estimated effort: **1-2 weeks**.
+- **Enterprise Authentication Integration:** Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
+
 ---
 
 ### System Diagram
@@ -87,8 +84,8 @@ graph LR
   collector -- "Gets Credentials" --> secrets_manager
   collector -- "Uploads Images" --> s3_bucket
   collector -- "Face Search/Index" --> rekognition_collection
-  hub -- "Stores Metadata,<br>Report & S3 Links" --> db
-  hub <--> |"GET/POST"| threat_intel_engine
+  hub -- "Writes Metadata<br>& S3 Links" --> db
+  threat_intel_engine <--> |"Reads Events,<br>Writes Reports"| db
   hub -- "Generates<br>Pre-signed URLs" --> s3_bucket
   
   %% User Interaction
