@@ -25,7 +25,6 @@ A technical review between CDW and Duke IT confirmed the proposed architecture a
     - 2 Collectors  
     - 1 Hub  
     - 1 Threat Intel Engine  
-    - +1 MongoDB container if DocumentDB is not used  
   - Each container requires 4 vCPU (`4000m`) and 16 GiB memory (`16384Mi`).
 
 - **Authentication:** Azure Entra will be used for authentication.
@@ -76,8 +75,7 @@ This section outlines the anticipated deployment and integration approach based 
 
 #### 4. Database & Data Management
 
-- MongoDB-compatible database recommended, with AWS DocumentDB preferred.
-- MongoDB container on EKS as fallback if DocumentDB is infeasible.
+- MongoDB-compatible AWS DocumentDB will be used.
 - Duke IT owns backup and recovery of S3 (images) and DocumentDB/MongoDB (metadata and reports).
 - Rekognition Face Collection is ephemeral; images can be re-indexed from S3 as needed.
 
