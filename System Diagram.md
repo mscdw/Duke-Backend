@@ -46,7 +46,8 @@ flowchart LR
   end
  subgraph subGraph4["EC2 or EKS Compute"]
     direction TB
-        collector["fa:fa-cogs<br>Collector (Our Code)"]
+        collector1["fa:fa-cogs<br>Collector (Our Code)<br>Substation 1"]
+        collector2["fa:fa-cogs<br>Collector (Our Code)<br>Substation 2"]
         hub["fa:fa-window-maximize<br>Hub (Our Code)"]
         threat_intel_engine["fa:fa-microchip<br>Threat Intel Engine (Our Code)"]
   end
@@ -78,39 +79,41 @@ flowchart LR
         Storage
         subGraph8
   end
-
     cameras_s1 --> avigilon1
     cameras_s2 --> avigilon2
+    avigilon1 -- HTTPS Poll --> vpn
+    avigilon2 -- HTTPS Poll --> vpn
+    vpn -- Secure Tunnel (S1) --> collector1
+    vpn -- Secure Tunnel (S2) --> collector2
+    collector1 -- Uploads Images --> s3_bucket
+    collector2 -- Uploads Images --> s3_bucket
+    collector1 -- Face Search/Index --> rekognition_collection
+    collector2 -- Face Search/Index --> rekognition_collection
+    collector1 -- Gets Secrets --> secrets_manager
+    collector2 -- Gets Secrets --> secrets_manager
+    collector1 -- POST Metadata --> hub
+    collector2 -- POST Metadata --> hub
+    collector1 -- Logs --> cloudwatch
+    collector2 -- Logs --> cloudwatch
+    hub -- Writes Events --> events_coll
+    hub -- "Generates<br>Pre-signed URLs" --> s3_bucket
+    hub -- Gets Secrets --> secrets_manager
+    hub -- Logs --> cloudwatch
+    threat_intel_engine -- Reads Threat Rules --> rules_coll
+    threat_intel_engine -- Writes Threat Reports --> reports_coll
+    threat_intel_engine -- Gets Secrets --> secrets_manager
+    threat_intel_engine -- Reads Events --> events_coll
+    threat_intel_engine -- Logs --> cloudwatch
     human_analyst["fa:fa-user-shield<br>Threat Analyst (User)"] -- UI/API Requests --> rbac
     rbac -- Authorized Requests --> hub
     human_analyst -. Reads Events<br>(via Hub) .-> events_coll
     human_analyst -. Reads Reports<br>(via Hub) .-> reports_coll
     human_analyst -. |Manages Threat Rules|<br>(via Hub) .-> rules_coll
     human_analyst -. "|Manages Person Re-ID Service<br>(Merge/Unmerge)|<br>(via Hub)" .-> persons_coll
-    avigilon1 -- HTTPS Poll --> vpn
-    avigilon2 -- HTTPS Poll --> vpn
-    vpn -- Secure Tunnel --> collector
-    collector -- Uploads Images --> s3_bucket
-    hub -- Writes Events --> events_coll
-    hub -- "Generates<br>Pre-signed URLs" --> s3_bucket
-    threat_intel_engine -- Reads Threat Rules --> rules_coll
-    threat_intel_engine -- Writes Threat Reports --> reports_coll
-    collector -- Face Search/Index --> rekognition_collection
-    collector -- Gets Secrets --> secrets_manager
-    hub -- Gets Secrets --> secrets_manager
-    threat_intel_engine -- Gets Secrets --> secrets_manager
-    collector -- POST Metadata --> hub
-    threat_intel_engine -- Reads Events --> events_coll
-    collector -- Logs --> cloudwatch
-    hub -- Logs --> cloudwatch
-    threat_intel_engine -- Logs --> cloudwatch
-
     note_analyst_flow["<br><b>Note on Analyst Actions:</b><br>All analyst data interactions<br>(reads/writes to storage)<br>are proxied through the <b>Hub</b>.<br>Dashed lines represent this<br>simplified logical flow.<br>"]
-    style note_analyst_flow fill:#fff9c4,stroke:#333,stroke-width:1px
-
-    %% Key infrastructure color classes
     style vpn fill:#1976d2,stroke:#1976d2,stroke-width:2px,color:#fff
-    style collector fill:#43a047,stroke:#388e3c,stroke-width:3px,color:#fff
+    style collector1 fill:#43a047,stroke:#388e3c,stroke-width:3px,color:#fff
+    style collector2 fill:#43a047,stroke:#388e3c,stroke-width:3px,color:#fff
     style hub fill:#43a047,stroke:#388e3c,stroke-width:3px,color:#fff
     style threat_intel_engine fill:#43a047,stroke:#388e3c,stroke-width:3px,color:#fff
     style rekognition_collection fill:#8e24aa,stroke:#6d1b7b,stroke-width:2px,color:#fff
@@ -121,6 +124,8 @@ flowchart LR
     style iam fill:#e53935,stroke:#b71c1c,stroke-width:2px,color:#fff
     style sg fill:#e53935,stroke:#b71c1c,stroke-width:2px,color:#fff
     style rbac fill:#00838f,stroke:#005662,stroke-width:2px,color:#fff
+    style note_analyst_flow fill:#fff9c4,stroke:#333,stroke-width:1px
+
 
 ```
 
