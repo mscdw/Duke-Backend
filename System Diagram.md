@@ -9,29 +9,29 @@
 
 A technical review between CDW and Duke IT confirmed the proposed software architecture is compatible with Duke's environment. The following decisions and requirements were established:
 
-*   **Action Item: Database Selection:** A final decision on the database is required.
-    *   **CDW Preference:** AWS DocumentDB.
-    *   **Alternative:** If DocumentDB is not feasible, CDW can run MongoDB in a dedicated container on EKS.
-*   **Code & CI/CD:** GitHub will be used for the code repository and GitHub Actions for CI/CD.
-*   **Container Orchestration:** The platform will run on **AWS EKS**.
-*   **Resource Requirements:** The deployment will require **4 application containers**, each with 4 vCPU ("4000m") and 16 GiB of memory ("16384Mi"). If the MongoDB alternative is chosen, the total will increase to **5 containers**.
-*   **Authentication:** **Azure Entra** will be used for authentication.
-*   **Secrets Management:** The platform will integrate with Duke's standard secrets management tool. Duke uses both **AWS Secrets Manager** and **HashiCorp Vault**; the specific integration will be implemented in Phase 2.
-*   **Logging:** **Splunk** is the standard for log aggregation. Logs written to the container's standard output will be collected.
-*   **API Behavior:** For multi-server Avigilon sites, API requests will be made to all available servers in the site.
+* **Action Item: Database Selection:** A final decision on the database is required.  
+  * **CDW Preference:** AWS DocumentDB.  
+  * **Alternative:** If DocumentDB is not feasible, CDW can run MongoDB in a dedicated container on EKS.
 
-### Phase 2 Enhancements (TODO)
+* **Code & CI/CD:** GitHub will be used for the code repository and GitHub Actions for CI/CD.
 
--   **Enterprise Authentication Integration:** Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
--   **Secrets Management Integration:** Integrate with Duke's standard secrets management tool (**AWS Secrets Manager** or **HashiCorp Vault**) for handling all application credentials.
--   **Dedicated Image Storage:** Store images in an AWS S3 bucket instead of MongoDB for cost-effective and scalable storage.
--   **Person Identity Management UI:** Interface within the Hub for analysts to merge, unmerge, and curate person identities in the re-identification collection.
--   **Rules Engine Management UI:** Allow analysts to create, edit, and manage deterministic rules via the Hub interface.
+* **Container Orchestration:** The platform will run on **AWS EKS**.
 
-### Post–Phase 2 PoV (Collector Scaling)
+* **Resource Requirements:**  
+  * The deployment will include:
+    * **2 Collectors**
+    * **1 Hub**
+    * **1 Threat Intel Engine**
+    * **+1 MongoDB container** if DocumentDB is not used  
+  * Each container requires **4 vCPU (`4000m`)** and **16 GiB memory (`16384Mi`)**
 
--   **Collector Management UI:** A section in the Hub to register new collectors, monitor their status, and manage site configurations.
--   **(Tentative): Scalability with Message Queues:** Refactor the internal data flow to use a message queue (e.g., Amazon SQS) to enable horizontal collector scaling. This decouples data ingestion from processing, improving reliability and throughput under load. Estimated effort: **1–2 weeks**.
+* **Authentication:** **Azure Entra** will be used for authentication.
+
+* **Secrets Management:** The platform will integrate with Duke's standard secrets management tool. Duke uses both **AWS Secrets Manager** and **HashiCorp Vault**; the specific integration will be implemented in Phase 2.
+
+* **Logging:** **Splunk** is the standard for log aggregation. Logs written to the container's standard output will be collected.
+
+* **API Behavior:** For multi-server Avigilon sites, API requests will be made to all available servers in the site.
 
 ---
 
@@ -147,7 +147,7 @@ flowchart LR
 
 ### System Architecture & IT Integration FAQ
 
-This document outlines the deployment and integration of our software within your AWS environment. Our model is to provide you with the **source code** for our platform (Collector, Hub, Threat Intel Engine), which is then deployed and run **entirely within your own AWS account**. You maintain full control over the infrastructure, data, and security. Our role is to partner with your teams to ensure a successful integration.
+This section outlines the deployment and integration of our software within your AWS environment. Our model is to provide you with the **source code** for our platform (Collector, Hub, Threat Intel Engine), which is then deployed and run **entirely within your own AWS account**. You maintain full control over the infrastructure, data, and security. Our role is to partner with your teams to ensure a successful integration.
 
 ---
 
@@ -225,3 +225,19 @@ This document outlines the deployment and integration of our software within you
 
 - **Monitoring & Logging**  
   - Our software will be configured to produce **structured logs (e.g., JSON)** that can be ingested by your enterprise logging and monitoring tools (e.g., Splunk, AWS CloudWatch Logs), which your teams will manage.
+
+---
+## Appendix: Planned Phase 2 PoV Enhancements
+
+The following functional enhancements are scoped for Phase 2:
+
+-   **Enterprise Authentication Integration:** Connect the RBAC service to an external identity provider (e.g., SAML, OIDC) for single sign-on.
+-   **Secrets Management Integration:** Integrate with Duke's standard secrets management tool (**AWS Secrets Manager** or **HashiCorp Vault**) for handling all application credentials.
+-   **Dedicated Image Storage:** Store images in an AWS S3 bucket instead of MongoDB for cost-effective and scalable storage.
+-   **Person Identity Management UI:** Interface within the Hub for analysts to merge, unmerge, and curate person identities in the re-identification collection.
+-   **Rules Engine Management UI:** Allow analysts to create, edit, and manage deterministic rules via the Hub interface.
+
+## Appendix: Post–Phase 2 PoV (Scalability Considerations)
+
+- **Collector Management UI:** Enable registration and monitoring of collectors via the Hub.
+- **(Tentative) Queue-Based Scaling:** Optionally refactor data flow to use a message queue (e.g., Amazon SQS) for better horizontal scaling of collectors. Estimated effort: ~1–2 weeks.
