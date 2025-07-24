@@ -155,8 +155,9 @@ This document outlines the deployment and integration of our software within you
     *   Our software is flexible and can be deployed on either **EC2 virtual machines or as containers within an EKS cluster** inside your AWS environment, according to your operational standards.
 
 *   **Scalability:**
-    *   For the initial **Proof of Value (PoV), an external message queue is not required**. The Collector communicates directly with the Hub, a flow designed to support up to two collection sites.
-    *   To enable **horizontal auto-scaling or to expand beyond two sites**, the architecture incorporates an external message queue (e.g., AWS SQS). This is a planned enhancement that requires a minor refactoring effort (~2 weeks).
+    *   **Phase 2 (Proof of Value):** The PoV architecture will support up to two sites using direct Collector-to-Hub communication. An external message queue is not included in the initial build.
+    *   **Phase 2 Assessment:** A key activity during this phase will be to **assess and validate the technical requirements for scaling beyond two sites**. This will determine if an external message queue (e.g., AWS SQS) is necessary.
+    *   **Future Implementation (Post-PoV):** If the assessment confirms the need for a queue, its implementation will be scoped for a subsequent phase. This is a known refactoring effort estimated at ~2 weeks.
 
 *   **Infrastructure as Code (IaC) & CI/CD:**
     *   The platform's deployment will integrate with your existing IaC (e.g., Terraform, CloudFormation) and CI/CD pipelines. We provide the application **source code**, and your teams will manage the build and deployment process, ensuring it meets all internal standards.
