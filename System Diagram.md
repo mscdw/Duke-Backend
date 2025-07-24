@@ -14,7 +14,7 @@
 ### Post–Phase 2 PoV (Scaling Beyond 2 Sites)
 
 - **Collector Management UI:** A section in the Hub to register new collectors, monitor their status, and manage site configurations.
-- **Scalability with Message Queues:** Refactor the internal data flow to use a message queue (e.g., Amazon SQS) to enable horizontal scaling beyond two sites. This decouples data ingestion from processing, improving reliability and throughput under load. Estimated effort: **1–2 weeks**.
+- **(Tentative): Scalability with Message Queues:** Refactor the internal data flow to use a message queue (e.g., Amazon SQS) to enable horizontal scaling beyond two sites. This decouples data ingestion from processing, improving reliability and throughput under load. Estimated effort: **1–2 weeks**.
 ---
 
 ### System Diagram
@@ -123,14 +123,7 @@ flowchart LR
     style rbac fill:#00838f,stroke:#005662,stroke-width:2px,color:#fff
 
 ```
-**Diagram Legend:**
-*   <span style="color:#2ecc71">**Green Lines:**</span> Primary data ingestion flow from on-premise to the cloud database.
-*   <span style="color:#3498db">**Blue Lines:**</span> User interaction flow, from the analyst's request to the consumption of data.
-*   <span style="color:#f39c12">**Orange Dashed Lines:**</span> Asynchronous, background analysis loop performed by the Threat Intel Engine.
-*   <span style="color:#9b59b6">**Purple Lines:**</span> Analyst management and configuration actions (e.g., managing rules and identities).
-*   <span style="color:#e74c3c">**Red Lines:**</span> Critical security operations, such as retrieving secrets.
-*   <span style="color:#95a5a6">**Gray Dashed Lines:**</span> Standard operational flow for logging.
-  
+
 ### System Architecture & IT Integration FAQ
 
 This document outlines the deployment and integration of our software within your AWS environment. Our model is to provide you with the **source code** for our platform (Collector, Hub, Threat Intel Engine), which is then deployed and run **entirely within your own AWS account**. You maintain full control over the infrastructure, data, and security. Our role is to partner with your teams to ensure a successful integration.
