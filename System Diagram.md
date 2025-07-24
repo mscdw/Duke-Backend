@@ -1,4 +1,4 @@
-## Duke Threat Intelligence Platform: Technical Overview & IT Integration Summary
+## Duke Advanced Threat Intelligence Platform
 
 ### Functional Overview
 
@@ -8,87 +8,6 @@
 - **Consumption:** The Hub’s UI provides a unified interface for Threat Analysts to access raw events, curated identities, and final Anomaly Reports from the database.
 
 ---
-
-### Duke IT Integration Summary
-
-A technical review between CDW and Duke IT confirmed the proposed architecture aligns with Duke’s environment and standards. The following key points and pending decisions emerged from these discussions:
-
-- **⚠️ Action Required: Database Selection**  
-  CDW recommends AWS DocumentDB as the production database. If DocumentDB is not feasible, a MongoDB container can be deployed within Duke’s EKS cluster.
-
-- **Code & CI/CD:** GitHub will be used for source code management and GitHub Actions for CI/CD pipelines.
-
-- **Container Orchestration:** The platform is planned to run on **AWS EKS**, consistent with Duke’s container standards.
-
-- **Resource Requirements:**  
-  - Deployment includes:
-    - 2 Collectors  
-    - 1 Hub  
-    - 1 Threat Intel Engine  
-  - Each container requires 4 vCPU (`4000m`) and 16 GiB memory (`16384Mi`).
-
-- **Authentication:** Azure Entra will be used for authentication.
-
-- **Secrets Management:** Integration will follow Duke’s existing tools; both AWS Secrets Manager and HashiCorp Vault are in use. Specific implementation details will be finalized later.
-
-- **Logging:** Splunk will be used for log aggregation, collecting logs written to container stdout.
-
-- **API Behavior:** For multi-server Avigilon sites, API requests will be sent to all servers within the site.
-
----
-
-### Technical Integration & Deployment Blueprint
-
-This section outlines the anticipated deployment and integration approach based on current understanding. The platform’s source code (Collector, Hub, Threat Intel Engine) will be deployed and run **entirely within Duke’s AWS account**, ensuring full control over infrastructure, data, and security. CDW’s role is to support Duke’s teams throughout integration.
-
-> **Note:** This document is for informational purposes only and does not constitute a formal agreement or commitment. All architectural details, resource sizing, and integrations remain subject to change pending final decisions and ongoing collaboration.
-
----
-
-#### 1. Network & Connectivity
-
-- Collector communicates with on-prem Avigilon servers over **HTTPS (port 443)** using existing approved network infrastructure (e.g., VPN, Direct Connect).
-- Polls only for image snapshots (~150KB each) and metadata, minimizing bandwidth usage.
-- Designed for batch processing; latency sensitivity is low.
-- Firewall rules and AWS Security Groups / Network ACLs will be defined collaboratively.
-
----
-
-#### 2. Cloud Infrastructure & Scalability
-
-- Deployment target: **AWS EKS** in line with Duke’s container orchestration standards.
-- Deployment includes 2 Collectors, 1 Hub, 1 Threat Intel Engine, and optionally a MongoDB container if DocumentDB is not used.
-- Each container is sized at 4 vCPU and 16 GiB memory.
-- Scaling model supports one Collector per site; initial Proof of Value scoped for two sites.
-- Source code and CI/CD managed via GitHub and GitHub Actions.
-
----
-
-#### 3. Security & Compliance
-
-- Data encrypted in transit (TLS) and at rest using native AWS services.
-- Duke to implement granular IAM policies adhering to least privilege.
-- Authentication via Azure Entra; secrets managed through AWS Secrets Manager or HashiCorp Vault.
-- Infrastructure and data remain under Duke’s control and governance.
-
----
-
-#### 4. Database & Data Management
-
-- MongoDB-compatible AWS DocumentDB will be used.
-- Duke IT owns backup and recovery of S3 (images) and DocumentDB/MongoDB (metadata and reports).
-- Rekognition Face Collection is ephemeral; images can be re-indexed from S3 as needed.
-
----
-
-#### 5. Operations & Maintenance
-
-- Duke IT Operations team will manage deployment, patching, and monitoring.
-- Application logs will integrate with Duke’s Splunk.
-- API requests to multi-server Avigilon sites will target all available servers.
-
----
-
 
 ### System Diagram
 
