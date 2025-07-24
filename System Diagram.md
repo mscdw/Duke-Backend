@@ -1,6 +1,4 @@
-# Threat Intelligence Platform
-
-## Overview
+## Threat Intelligence Platform Overview
 - **Ingestion & Enrichment:** A Collector polls Avigilon for event data, uploads the associated image directly to S3, and enriches the event metadata with a face signature from AWS Rekognition.
 - **Persistence for Analysis:** A central Hub receives the complete metadata package (including the S3 image link and Rekognition results) from the Collector and persists it to the database, staging the data for the analysis engine.
 - **Batch Analysis & Reporting:** The Threat Intel Engine operates as an independent batch process. It periodically queries the database for new events, performs its analysis, and writes the resulting Anomaly Reports directly back to the database.
