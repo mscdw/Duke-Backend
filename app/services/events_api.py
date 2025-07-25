@@ -3,7 +3,7 @@ from typing import Dict, Any, AsyncGenerator
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.services.avigilon_api import get_sites_service
+from app.services.avigilon_api import get_servers_service
 
 settings = get_settings()
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
@@ -73,16 +73,20 @@ async def fetch_and_yield_event_pages(
     """
     Fetches events in pages and yields each page as soon as it's received.
     """
-    sites_resp = await get_sites_service()
-    if not sites_resp or sites_resp.status_code != 200:
-        logger.error("Could not fetch sites to get server ID for event search.")
+    servers_resp = await get_servers_service()
+    if not servers_resp or servers_resp.status_code != 200:
+        logger.error("Could not fetch servers to get server ID for event search.")
         return
 
-    sites_data = sites_resp.json()
+    servers_data = servers_resp.json()
     try:
-        server_id = "V3ov5LEAQdq9_i1jRVj28w"
-    except (IndexError, KeyError) as e:
-        logger.error(f"Could not parse server ID from sites response: {e}", exc_info=True)
+        server_ids = servers_data.get("result", [])
+        if not server_ids:
+            logger.error("No server IDs returned from API, cannot fetch events.")
+            return
+        server_id = server_ids[0]  # Assuming we use the first server
+    except (IndexError, KeyError, TypeError) as e:
+        logger.error(f"Could not parse server ID from servers response: {e}", exc_info=True)
         return
 
     resp = await search_events_service(

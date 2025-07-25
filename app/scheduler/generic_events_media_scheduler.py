@@ -2,12 +2,24 @@ import asyncio
 import httpx
 import base64
 from typing import List, Dict, Any, Optional
+import uuid
+import boto3
+from botocore.exceptions import ClientError
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timezone
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.services.media_api import get_media_service
+
+# --- S3 Configuration ---
+try:
+    s3_client = boto3.client("s3")
+    S3_BUCKET_NAME = get_settings().S3_FACE_IMAGE_BUCKET # Using one bucket for all event images
+except Exception as e:
+    logger.error(f"Failed to initialize S3 client or get bucket name: {e}. S3 uploads will fail.", exc_info=True)
+    s3_client = None
+    S3_BUCKET_NAME = None
 
 logger = get_logger("generic-events-media-scheduler")
 settings = get_settings()
@@ -27,10 +39,37 @@ TARGET_EVENT_TYPE = "DEVICE_CLASSIFIED_OBJECT_MOTION_START"
 BATCH_SIZE = 10  # How many events to fetch and process in a single batch.
 
 
-async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+async def upload_media_to_s3(image_bytes: bytes, event_timestamp: str) -> Optional[str]:
     """
-    Fetches JPEG media for a single event and returns an update payload.
-    JSON fetching is temporarily commented out.
+    Uploads image bytes to S3 and returns the S3 object key.
+    """
+    if not all([s3_client, S3_BUCKET_NAME, image_bytes, event_timestamp]):
+        logger.warning("S3 upload skipped due to missing client, bucket, or data.")
+        return None
+
+    try:
+        dt_obj = datetime.fromisoformat(event_timestamp.replace("Z", "+00:00"))
+        # A generic path for event-related images
+        s3_key = (
+            f"events/{dt_obj.year}/{dt_obj.month:02d}/{dt_obj.day:02d}/"
+            f"{dt_obj.strftime('%H-%M-%S')}-{uuid.uuid4()}.jpg"
+        )
+
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=s3_key, Body=image_bytes, ContentType="image/jpeg"),
+        )
+        logger.debug(f"Successfully uploaded image to S3: {s3_key}")
+        return s3_key
+    except (ClientError, Exception) as e:
+        logger.error(f"Failed to upload image to S3 for event at {event_timestamp}: {e}", exc_info=True)
+        return None
+
+
+async def _process_and_upload_media(event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    Fetches JPEG media for a single event, uploads it to S3, and returns an update payload.
     """
     event_id = event.get("_id")
     camera_id = event.get("cameraId")
@@ -40,36 +79,16 @@ async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, A
         logger.warning(f"Skipping event due to missing data needed for media fetch: {event}")
         return None
 
-    update_payload = {"eventId": event_id}
-    
-    # --- JSON Fetching (Commented Out) ---
-    # To re-enable, uncomment the task creation and add it to asyncio.gather below.
-    # json_task = get_media_service(camera_id, timestamp, "json")
-    
-    # Fetch JPEG media
-    jpeg_task = get_media_service(camera_id, timestamp, "jpeg")
-
-    # return_exceptions=True prevents one failed request from stopping the others.
-    # When re-enabling JSON, the gather call should be:
-    # results = await asyncio.gather(json_task, jpeg_task, return_exceptions=True)
-    # json_media_resp, jpeg_media_resp = results
-    results = await asyncio.gather(jpeg_task, return_exceptions=True)
-    jpeg_media_resp = results[0] # Get the first (and only) result from the list.
-
-    # --- Process JSON media response (Commented Out) ---
-    # if isinstance(json_media_resp, httpx.Response) and json_media_resp.status_code == 200:
-    #     # Store the response body as raw text, as it may not be strict JSON.
-    #     update_payload["json"] = json_media_resp.text
-    # else:
-    #     # Log either the failed response status or the exception that occurred.
-    #     reason = json_media_resp if isinstance(json_media_resp, Exception) else getattr(json_media_resp, 'status_code', 'N/A')
-    #     logger.warning(
-    #         f"Failed to fetch JSON media for event {event_id}. Reason: {reason}"
-    #     )
+    # Fetch JPEG media from the source (e.g., Avigilon)
+    jpeg_media_resp = await get_media_service(camera_id, timestamp, "jpeg")
 
     # Process JPEG media response
     if isinstance(jpeg_media_resp, httpx.Response) and jpeg_media_resp.status_code == 200:
-        update_payload["imageBaseString"] = base64.b64encode(jpeg_media_resp.content).decode("utf-8")
+        image_bytes = jpeg_media_resp.content
+        s3_key = await upload_media_to_s3(image_bytes, timestamp)
+        if s3_key:
+            # Return a payload with the eventId and the new S3 key
+            return {"eventId": event_id, "s3ImageKey": s3_key}
     else:
         # Log either the failed response status or the exception that occurred.
         reason = jpeg_media_resp if isinstance(jpeg_media_resp, Exception) else getattr(jpeg_media_resp, 'status_code', 'N/A')
@@ -77,11 +96,7 @@ async def _fetch_and_encode_media(event: Dict[str, Any]) -> Optional[Dict[str, A
             f"Failed to fetch JPEG media for event {event_id}. Reason: {reason}"
         )
 
-    # Only return a payload if the image was successfully fetched
-    if "imageBaseString" in update_payload:
-        return update_payload
-
-    logger.error(f"Failed to fetch any media for event {event_id}.")
+    logger.error(f"Failed to fetch or upload media for event {event_id}.")
     return None
 
 
@@ -119,7 +134,7 @@ async def enrich_events_job_logic():
                 logger.info(f"Found {len(events_to_process)} events. Fetching media concurrently...")
 
                 # 2. Concurrently fetch media for the entire batch
-                enrichment_tasks = [_fetch_and_encode_media(event) for event in events_to_process]
+                enrichment_tasks = [_process_and_upload_media(event) for event in events_to_process]
                 update_payloads = await asyncio.gather(*enrichment_tasks)
                 valid_updates = [p for p in update_payloads if p is not None]
 
@@ -129,8 +144,6 @@ async def enrich_events_job_logic():
                     else: continue
 
                 # 3. Post the batch of updates back to the central application
-                # logger.info("Update payloads: %s", valid_updates)
-
                 logger.info(f"Posting {len(valid_updates)} media updates back to the central app...")
                 try:
                     update_resp = await client.post(UPDATE_EVENTS_MEDIA_URL, json={"updates": valid_updates})
@@ -164,7 +177,7 @@ def start_generic_events_media_scheduler():
     scheduler.add_job(
         generic_events_media_enrichment_job,
         "interval",
-        hours=1, # Run every hour to catch up on "today's" data.
+        minutes=1, # Run every hour to catch up on "today's" data.
         next_run_time=datetime.now(timezone.utc),
         misfire_grace_time=600, # 10 minutes
     )
