@@ -191,7 +191,7 @@ def start_generic_events_media_scheduler():
     scheduler.add_job(
         generic_events_media_enrichment_job,
         "interval",
-        hours=1, # Run every hour to catch up on "today's" data.
+        minutes=1, # Run every hour to catch up on "today's" data.
         next_run_time=datetime.now(timezone.utc),
         misfire_grace_time=600, # 10 minutes
     )
