@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     AVIGILON_API_VERIFY_SSL: bool = False
     SESSION_TOKEN: str = ""
     CENTRAL_BASE: str = ""
+    S3_FACE_IMAGE_BUCKET: str = ""
     class Config:
         env_file = ".env"
 
