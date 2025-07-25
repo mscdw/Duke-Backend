@@ -35,8 +35,8 @@ EVENTS_FOR_ENRICHMENT_URL = f"{central_base_url.rstrip('/')}/events-for-enrichme
 UPDATE_EVENTS_MEDIA_URL = f"{central_base_url.rstrip('/')}/events/media"
 
 # --- Configuration ---
-TARGET_EVENT_TYPE = "DEVICE_CLASSIFIED_OBJECT_MOTION_START"
-BATCH_SIZE = 10  # How many events to fetch and process in a single batch.
+TARGET_EVENT_TYPES = ["DEVICE_CLASSIFIED_OBJECT_MOTION_START", "CUSTOM_APPEARANCE"]
+BATCH_SIZE = 10 # How many events to fetch and process in a single batch.
 
 
 async def upload_media_to_s3(image_bytes: bytes, event_timestamp: str) -> Optional[str]:
@@ -72,10 +72,22 @@ async def _process_and_upload_media(event: Dict[str, Any]) -> Optional[Dict[str,
     Fetches JPEG media for a single event, uploads it to S3, and returns an update payload.
     """
     event_id = event.get("_id")
+    event_type = event.get("type")
     camera_id = event.get("cameraId")
-    timestamp = event.get("timestamp")
 
-    if not all([event_id, camera_id, timestamp]):
+    # Determine the correct timestamp to use for media fetching
+    if event_type == "CUSTOM_APPEARANCE":
+        # For appearances, the best image is usually in the first snapshot
+        try:
+            timestamp = event["snapshots"][0]["timestamp"]
+        except (KeyError, IndexError, TypeError):
+            logger.warning(f"Skipping CUSTOM_APPEARANCE event {event_id} because it lacks a valid snapshot timestamp.")
+            return None
+    else:
+        # For other events, use the main event timestamp
+        timestamp = event.get("timestamp")
+
+    if not all([event_id, camera_id, timestamp, event_type]):
         logger.warning(f"Skipping event due to missing data needed for media fetch: {event}")
         return None
 
@@ -104,61 +116,61 @@ async def enrich_events_job_logic():
     """The core async logic for the media enrichment job."""
     logger.info("Starting generic event media enrichment job...")
     total_enriched_count = 0
+    
+    timeout_config = httpx.Timeout(10.0, read=60.0)
+    async with httpx.AsyncClient(verify=verify_ssl, timeout=timeout_config) as client:
+        for event_type in TARGET_EVENT_TYPES:
+            logger.info(f"--- Processing enrichment for event type: {event_type} ---")
+            try:
+                while True:
+                    # 1. Fetch a batch of events that need enrichment from your central app
+                    logger.info(f"Fetching a batch of up to {BATCH_SIZE} '{event_type}' events to enrich...")
+                    try:
+                        params = {"type": event_type, "limit": BATCH_SIZE}
+                        resp = await client.get(EVENTS_FOR_ENRICHMENT_URL, params=params)
+                        resp.raise_for_status()
+                        events_to_process = resp.json().get("events", [])
+                    except httpx.RequestError as e:
+                        logger.error(
+                            f"Could not connect to central app at {EVENTS_FOR_ENRICHMENT_URL}. Please check network connectivity.",
+                            exc_info=True)
+                        break # Break inner loop for this type
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"Failed to fetch events for enrichment: {e.response.status_code} - {e.response.text}")
+                        break # Break inner loop for this type
 
-    try:
-        # Use more granular timeouts: 10s to connect, 60s to read the response.
-        # This helps fail faster if the service is unreachable.
-        timeout_config = httpx.Timeout(10.0, read=60.0)
-        async with httpx.AsyncClient(verify=verify_ssl, timeout=timeout_config) as client:
-            while True:
-                # 1. Fetch a batch of events that need enrichment from your central app
-                logger.info(f"Fetching a batch of up to {BATCH_SIZE} events to enrich...")
-                try:
-                    params = {"type": TARGET_EVENT_TYPE, "limit": BATCH_SIZE}
-                    resp = await client.get(EVENTS_FOR_ENRICHMENT_URL, params=params)
-                    resp.raise_for_status()
-                    events_to_process = resp.json().get("events", [])
-                except httpx.RequestError as e:
-                    logger.error(
-                        f"Could not connect to central app at {EVENTS_FOR_ENRICHMENT_URL}. Please check network connectivity.",
-                        exc_info=True)
-                    break
-                except httpx.HTTPStatusError as e:
-                    logger.error(f"Failed to fetch events for enrichment: {e.response.status_code} - {e.response.text}")
-                    break
+                    if not events_to_process:
+                        logger.info(f"No more '{event_type}' events to enrich. Moving to next type.")
+                        break
 
-                if not events_to_process:
-                    logger.info("No more events to enrich. Job finished for this run.")
-                    break
+                    logger.info(f"Found {len(events_to_process)} events. Fetching media concurrently...")
 
-                logger.info(f"Found {len(events_to_process)} events. Fetching media concurrently...")
+                    # 2. Concurrently fetch media for the entire batch
+                    enrichment_tasks = [_process_and_upload_media(event) for event in events_to_process]
+                    update_payloads = await asyncio.gather(*enrichment_tasks)
+                    valid_updates = [p for p in update_payloads if p is not None]
 
-                # 2. Concurrently fetch media for the entire batch
-                enrichment_tasks = [_process_and_upload_media(event) for event in events_to_process]
-                update_payloads = await asyncio.gather(*enrichment_tasks)
-                valid_updates = [p for p in update_payloads if p is not None]
+                    if not valid_updates:
+                        logger.warning("No media could be fetched for the current batch.")
+                        if len(events_to_process) < BATCH_SIZE: break
+                        else: continue
 
-                if not valid_updates:
-                    logger.warning("No media could be fetched for the current batch.")
-                    if len(events_to_process) < BATCH_SIZE: break
-                    else: continue
+                    # 3. Post the batch of updates back to the central application
+                    logger.info(f"Posting {len(valid_updates)} media updates back to the central app...")
+                    try:
+                        update_resp = await client.post(UPDATE_EVENTS_MEDIA_URL, json={"updates": valid_updates})
+                        update_resp.raise_for_status()
+                        updated_count = update_resp.json().get("updated_count", len(valid_updates))
+                        total_enriched_count += updated_count
+                        logger.info(f"Successfully updated {updated_count} events with media.")
+                    except httpx.HTTPStatusError as e:
+                        logger.error(f"Failed to post media updates: {e.response.status_code} - {e.response.text}")
 
-                # 3. Post the batch of updates back to the central application
-                logger.info(f"Posting {len(valid_updates)} media updates back to the central app...")
-                try:
-                    update_resp = await client.post(UPDATE_EVENTS_MEDIA_URL, json={"updates": valid_updates})
-                    update_resp.raise_for_status()
-                    updated_count = update_resp.json().get("updated_count", len(valid_updates))
-                    total_enriched_count += updated_count
-                    logger.info(f"Successfully updated {updated_count} events with media.")
-                except httpx.HTTPStatusError as e:
-                    logger.error(f"Failed to post media updates: {e.response.status_code} - {e.response.text}")
-
-                if len(events_to_process) < BATCH_SIZE:
-                    logger.info("Processed the last available batch of events.")
-                    break
-    except Exception as e:
-        logger.error(f"A critical unhandled error occurred during the enrichment job: {e}", exc_info=True)
+                    if len(events_to_process) < BATCH_SIZE:
+                        logger.info(f"Processed the last available batch of '{event_type}' events.")
+                        break
+            except Exception as e:
+                logger.error(f"A critical unhandled error occurred during enrichment for type '{event_type}': {e}", exc_info=True)
 
     logger.info(f"--- Media Enrichment Summary ---")
     logger.info(f"Total events enriched in this run: {total_enriched_count}")
@@ -166,8 +178,10 @@ async def enrich_events_job_logic():
 
 def generic_events_media_enrichment_job():
     """Synchronous wrapper for APScheduler."""
-    asyncio.run(enrich_events_job_logic())
-    # pass
+    try:
+        asyncio.run(enrich_events_job_logic())
+    except Exception as e:
+        logger.error(f"The async job runner for media enrichment crashed: {e}", exc_info=True)
 
 
 def start_generic_events_media_scheduler():
@@ -177,7 +191,7 @@ def start_generic_events_media_scheduler():
     scheduler.add_job(
         generic_events_media_enrichment_job,
         "interval",
-        minutes=1, # Run every hour to catch up on "today's" data.
+        hours=1, # Run every hour to catch up on "today's" data.
         next_run_time=datetime.now(timezone.utc),
         misfire_grace_time=600, # 10 minutes
     )

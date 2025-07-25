@@ -2,30 +2,18 @@ import asyncio
 import httpx
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime, timedelta, timezone, date as date_obj
-import json
-import base64
-import uuid
-import boto3
-from botocore.exceptions import ClientError
 
 from app.core.config import get_settings
 from app.core.logging import get_logger
-from app.services.appearance_api import fetch_all_face_events
 from app.services.avigilon_api import get_servers_service
 
 logger = get_logger("generic-events-scheduler")
 settings = get_settings()
 
-# --- S3 Configuration ---
-# NOTE: Ensure your environment has AWS credentials configured (e.g., via IAM role or env vars)
-# and that the S3_FACE_IMAGE_BUCKET is defined in your settings.
-try:
-    s3_client = boto3.client("s3")
-    S3_BUCKET_NAME = settings.S3_FACE_IMAGE_BUCKET
-except Exception as e:
-    logger.error(f"Failed to initialize S3 client or get bucket name: {e}. Face image uploads will fail.", exc_info=True)
-    s3_client = None
-    S3_BUCKET_NAME = None
+# --- Constants for Appearance Search ---
+FACET_GENDER = "GENDER"
+TAG_MALE = "MALE"
+TAG_FEMALE = "FEMALE"
 
 central_base_url = settings.CENTRAL_BASE
 post_endpoint = "/store-events"
@@ -41,9 +29,9 @@ API_PAGE_SIZE = 100
 verify_ssl = settings.AVIGILON_API_VERIFY_SSL
 DEFAULT_BACKFILL_DAYS = 30
 
-# --- NEW: Helper for Token-Based Pagination ---
-# NOTE: This function is designed to work with an Avigilon-like /events/search API.
-# It would ideally be placed in a dedicated service file (e.g., app/services/events_api.py).
+# --- Helpers for Token-Based Pagination ---
+# NOTE: These functions are designed to work with Avigilon-like APIs.
+# They would ideally be placed in a dedicated service file (e.g., app/services/events_api.py).
 async def fetch_events_with_token_pagination(client: httpx.AsyncClient, server_id: str, from_time: str, to_time: str, limit: int):
     """
     Asynchronously fetches events from a source API using token-based pagination.
@@ -51,8 +39,6 @@ async def fetch_events_with_token_pagination(client: httpx.AsyncClient, server_i
     Yields:
         A list of event dictionaries per page.
     """
-    # This assumes the base URL for the source (e.g., Avigilon) API is configured in settings.
-    # The session/auth headers are assumed to be handled by the httpx.AsyncClient instance.
     source_api_base_url = getattr(settings, "AVIGILON_BASE", "")
     if not source_api_base_url:
         logger.error("AVIGILON_BASE setting is not configured. Cannot fetch generic events.")
@@ -103,6 +89,68 @@ async def fetch_events_with_token_pagination(client: httpx.AsyncClient, server_i
             break
         except Exception as e:
             logger.error(f"Error fetching event page {page_num} from source API: {e}", exc_info=True)
+            break
+
+
+async def fetch_appearances_with_token_pagination(client: httpx.AsyncClient, query_descriptors: list, from_time: str, to_time: str, limit: int):
+    """
+    Asynchronously fetches appearance events from a source API using token-based pagination.
+    This uses search-by-description to get all male and female appearances.
+
+    Yields:
+        A list of appearance event dictionaries per page.
+    """
+    source_api_base_url = getattr(settings, "AVIGILON_BASE", "")
+    if not source_api_base_url:
+        logger.error("AVIGILON_BASE setting is not configured. Cannot fetch appearance events.")
+        return
+
+    search_endpoint = "/appearance/search-by-description" # The target endpoint
+    url = f"{source_api_base_url.rstrip('/')}{search_endpoint}"
+
+    # The /appearance/search-by-description endpoint uses a POST request with a JSON body.
+    json_payload = {
+        "session": settings.SESSION_TOKEN,
+        "queryType": "TIME_RANGE",
+        "queryDescriptors": query_descriptors,
+        "from": from_time,
+        "to": to_time,
+        "limit": limit,
+        "scanType": "FULL"
+    }
+    page_num = 0
+    gender_tag = query_descriptors[0].get('tag', 'UNKNOWN')
+
+    while True:
+        page_num += 1
+        try:
+            logger.debug(f"Fetching appearance page {page_num} for {gender_tag} from source API with payload: {json_payload}")
+            response = await client.post(url, json=json_payload)
+            response.raise_for_status()
+            data = response.json()
+
+            # The response structure is assumed to be {"result": {"results": [...], "token": "..."}}
+            result_data = data.get("result", {})
+            appearances = result_data.get("results", [])
+            if appearances:
+                yield appearances
+
+            token = result_data.get("token")
+            if token:
+                # For the next request, use the token.
+                json_payload = {
+                    "session": settings.SESSION_TOKEN,
+                    "queryType": "CONTINUE",
+                    "token": token,
+                }
+            else:
+                logger.info(f"No more pagination tokens for appearances for {gender_tag}. Fetched a total of {page_num} page(s).")
+                break
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error on page {page_num} while fetching appearances for {gender_tag} from source API: {e.response.status_code} - {e.response.text}")
+            break
+        except Exception as e:
+            logger.error(f"Error fetching appearance page {page_num} for {gender_tag} from source API: {e}", exc_info=True)
             break
 
 
@@ -213,164 +261,161 @@ def generic_events_fetch_job():
     asyncio.run(fetch_and_post_logic())
 
 
-# --- S3 Image Upload Helper ---
-async def upload_face_image_to_s3(base64_image_data: str, event_timestamp: str) -> str | None:
+# --- FACE EVENTS JOB ---
+
+async def face_events_fetch_and_post_logic():
     """
-    Decodes a base64 image, uploads it to S3, and returns the S3 object key.
-
-    Args:
-        base64_image_data: The base64-encoded image string.
-        event_timestamp: The ISO format timestamp of the event for path generation.
-
-    Returns:
-        The S3 object key if successful, otherwise None.
+    Fetches new face appearance events since the last run, standardizes them,
+    and posts them to the central API. Media enrichment and facial recognition
+    are handled by downstream schedulers.
     """
-    if not all([s3_client, S3_BUCKET_NAME, base64_image_data, event_timestamp]):
-        logger.warning("S3 upload skipped due to missing client, bucket, or data.")
-        return None
+    logger.info("--- Starting FACE event processing job ---")
 
+    # 1. Get Server ID first. This will be used for enriching the event payload.
+    server_id = None
     try:
-        # Create a structured path based on the event time
-        dt_obj = datetime.fromisoformat(event_timestamp.replace("Z", "+00:00"))
-        s3_key = (
-            f"faces/{dt_obj.year}/{dt_obj.month:02d}/{dt_obj.day:02d}/"
-            f"{dt_obj.strftime('%H-%M-%S')}-{uuid.uuid4()}.jpg"
-        )
+        servers_resp = await get_servers_service()
+        if not (servers_resp and servers_resp.status_code == 200):
+            logger.error(f"Failed to fetch servers to determine server ID. Status: {servers_resp.status_code if servers_resp else 'N/A'}. Aborting job.")
+            return
 
-        # Decode the base64 string. It might contain a data URI header.
-        if "," in base64_image_data:
-            _header, encoded = base64_image_data.split(",", 1)
-        else:
-            encoded = base64_image_data
+        servers_data = servers_resp.json()
+        servers_list = servers_data.get("result", {}).get("servers", [])
+        
+        if not servers_list:
+            logger.error("No sites/servers found in the API response. Cannot fetch face events. Aborting job.")
+            return
 
-        image_data = base64.b64decode(encoded)
+        server_id = servers_list[0].get("id")
+        if not server_id:
+            logger.error("First server found has no ID. Cannot fetch face events. Aborting job.")
+            return
+        logger.info(f"Found server ID: {server_id}. Proceeding with face event fetch.")
+    except Exception as e:
+        logger.error(f"A critical error occurred while fetching server ID: {e}. Aborting job.", exc_info=True)
+        return
 
-        # Upload to S3. boto3's s3 client methods are synchronous, so we run in an executor.
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=s3_key, Body=image_data, ContentType="image/jpeg"),
-        )
-        logger.debug(f"Successfully uploaded image to S3: {s3_key}")
-        return s3_key
-    except (ClientError, base64.binascii.Error, Exception) as e:
-        logger.error(f"Failed to upload image to S3 for event at {event_timestamp}: {e}", exc_info=True)
-        return None
-
-
-# --- CORRECTED FACE EVENTS JOB ---
-
-async def face_events_logic():
-    logger.info("--- STARTING ROBUST FACE EVENTS JOB ---")
-    # 1. Determine the starting day ONCE at the beginning of the job.
+    # 2. Determine the time window to process based on the last stored event.
+    from_time_dt: datetime
     try:
-        # Check for a manual backfill start date override via environment variable
-        manual_start_date_str = getattr(settings, "FACE_BACKFILL_START_DATE", None)
-        if manual_start_date_str:
-            # Expecting ISO date format like "YYYY-MM-DD"
-            current_day_to_process = date_obj.fromisoformat(manual_start_date_str)
-            logger.warning(f"MANUAL OVERRIDE: Using FACE_BACKFILL_START_DATE. Starting process from: {current_day_to_process}")
+        manual_start_time_str = getattr(settings, "FACE_BACKFILL_START_TIME", None)
+        if manual_start_time_str:
+            from_time_dt = datetime.fromisoformat(manual_start_time_str)
+            logger.warning(f"MANUAL OVERRIDE: Using FACE_BACKFILL_START_TIME: {from_time_dt.isoformat()}")
         else:
             async with httpx.AsyncClient(verify=verify_ssl, timeout=60) as client:
                 response = await client.get(latest_face_ts_url)
                 response.raise_for_status()
-                latest_timestamp_str = response.json().get("latest_timestamp")
-                
+                data = response.json()
+                latest_timestamp_str = data.get("latest_timestamp")
+
                 if latest_timestamp_str:
-                    latest_event_date = datetime.fromisoformat(latest_timestamp_str.replace("Z", "+00:00")).date()
-                    current_day_to_process = latest_event_date + timedelta(days=1)
-                    logger.info(f"Last processed day was {latest_event_date}. Starting process from: {current_day_to_process}")
+                    from_time_dt = datetime.fromisoformat(latest_timestamp_str.replace("Z", "+00:00"))
+                    logger.info(f"Last processed face event timestamp found: {from_time_dt.isoformat()}. Fetching new events since then.")
                 else:
-                    current_day_to_process = datetime.now(timezone.utc).date() - timedelta(days=DEFAULT_BACKFILL_DAYS)
-                    logger.info(f"No previous data found. Starting backfill from: {current_day_to_process}")
+                    from_time_dt = datetime.now(timezone.utc) - timedelta(days=DEFAULT_BACKFILL_DAYS)
+                    logger.info(f"No previous face events found. Starting backfill from: {from_time_dt.isoformat()}")
     except Exception as e:
-        logger.error(f"Could not determine start day from API. Aborting job: {e}", exc_info=True)
+        logger.error(f"Could not determine start time for FACE events: {e}. Aborting job.", exc_info=True)
         return
 
-    # 2. Loop through days until we are caught up.
-    today = datetime.now(timezone.utc).date()
-    while current_day_to_process < today:
-        logger.info(f"--- Processing day: {current_day_to_process} ---")
-        
-        from_time_dt = datetime(current_day_to_process.year, current_day_to_process.month, current_day_to_process.day, 0, 0, 0, tzinfo=timezone.utc)
-        to_time_dt = datetime(current_day_to_process.year, current_day_to_process.month, current_day_to_process.day, 23, 59, 59, tzinfo=timezone.utc)
-        from_time = from_time_dt.isoformat().replace("+00:00", "Z")
-        to_time = to_time_dt.isoformat().replace("+00:00", "Z")
+    to_time_dt = datetime.now(timezone.utc)
+    from_time_dt_buffered = from_time_dt + timedelta(milliseconds=1)
 
-        try:
-            payload = await fetch_all_face_events(from_time, to_time)
-            appearances = payload.get("results") or payload.get("appearances", [])
+    if from_time_dt_buffered >= to_time_dt:
+        logger.info("System is already up-to-date. No new time window to process for face events.")
+        return
 
-            if not appearances:
-                logger.info(f"Day {current_day_to_process} was empty. Advancing to the next day.")
-                current_day_to_process += timedelta(days=1)
-                continue
+    from_time_iso = from_time_dt_buffered.isoformat().replace("+00:00", "Z")
+    to_time_iso = to_time_dt.isoformat().replace("+00:00", "Z")
 
-            logger.info(f"Found {len(appearances)} events for {current_day_to_process}. Transforming, uploading images, and posting.")
+    total_posted_count, total_failed_pages, total_pages_processed = 0, 0, 0
+    logger.info(f"Processing face events for time window: {from_time_iso} to {to_time_iso}")
 
-            events_to_post = []
-            for appearance in appearances:
-                if not isinstance(appearance, dict):
-                    continue
+    # Define the descriptors for male and female searches to get all human appearances
+    gender_descriptors = [
+        [{"facet": FACET_GENDER, "tag": TAG_MALE}],
+        [{"facet": FACET_GENDER, "tag": TAG_FEMALE}]
+    ]
 
-                # Pop the base64 image to be replaced by an S3 key.
-                # Assuming the field is 'faceImage'. This may need to be adjusted.
-                base64_image = appearance.pop("faceImage", None)
-                event_timestamp = appearance.get("eventStartTime")
+    try:
+        async with httpx.AsyncClient(verify=verify_ssl, timeout=300) as client:
+            for descriptors in gender_descriptors:
+                gender_tag = descriptors[0]['tag']
+                logger.info(f"--- Starting fetch for GENDER: {gender_tag} ---")
+                page_number = 0
+                async for appearance_page in fetch_appearances_with_token_pagination(client, descriptors, from_time_iso, to_time_iso, limit=API_PAGE_SIZE):
+                    page_number += 1
+                    total_pages_processed += 1
+                    if not appearance_page: continue
 
-                if base64_image and event_timestamp:
-                    s3_key = await upload_face_image_to_s3(base64_image, event_timestamp)
-                    if s3_key:
-                        # Add the S3 key to the event payload
-                        appearance["s3ImageKey"] = s3_key
-                    else:
-                        # If upload fails, we skip this event to avoid storing incomplete data.
-                        logger.warning(f"Skipping event {appearance.get('id')} for timestamp {event_timestamp} due to S3 upload failure.")
+                    events_to_post = []
+                    for appearance in appearance_page:
+                        if not isinstance(appearance, dict): continue
+
+                        # The raw appearance event from the source API uses 'timestamp' for the event time.
+                        # We must use this key and then standardize the payload for our system.
+                        event_timestamp = appearance.get("timestamp")
+                        if not event_timestamp:
+                            logger.warning(f"Skipping appearance with no 'timestamp' field: {appearance.get('id')}")
+                            continue
+
+                        # Standardize event fields for consistent storage, similar to other services.
+                        # We also rename 'deviceGid' to 'cameraId' for downstream compatibility.
+                        appearance["type"] = "CUSTOM_APPEARANCE"
+                        appearance["timestamp"] = event_timestamp
+                        appearance["eventStartTime"] = event_timestamp # Add for consistency
+                        appearance["originatingServerId"] = server_id
+                        appearance["originatingEventId"] = server_id # Per request
+                        appearance["thisId"] = server_id # Temp hack for index TODO review
+                        appearance["cameraId"] = appearance.pop("deviceGid", None) # Rename for media enrichment
+                        events_to_post.append(appearance)
+
+                    if not events_to_post:
+                        logger.warning(f"Page {page_number} for {gender_tag} resulted in 0 events to post after transformation.")
                         continue
 
-                # Standardize event fields
-                appearance["type"] = "CUSTOM_APPEARANCE"
-                appearance["timestamp"] = event_timestamp
-                appearance["cameraId"] = appearance.get("cameraId")
-                appearance["originatingServerId"] = appearance.get("originatingServerId")
-                appearance["originatingEventId"] = appearance.get("id", 1)
-                appearance["thisId"] = appearance.get("id", 1)
-                events_to_post.append(appearance)
-
-            if not events_to_post:
-                logger.warning(f"Transformation and S3 upload for {current_day_to_process} resulted in 0 events to post. Advancing to next day.")
-                current_day_to_process += timedelta(days=1)
-                continue
-
-            async with httpx.AsyncClient(verify=verify_ssl, timeout=600) as client:
-                response = await client.post(post_url, json={"events": events_to_post})
-                response.raise_for_status()
-                stored_count = response.json().get("stored_count", len(events_to_post))
-                logger.info(f"Successfully posted {stored_count} face events for {current_day_to_process}.")
-
-            # IMPORTANT: After finding and posting data, break the loop.
-            # The next scheduled job run will pick up from this new state.
-            logger.info("Data found and posted for this run. The scheduler will continue from here on the next run.")
-            break 
+                    logger.info(f"Posting page {page_number} with {len(events_to_post)} {gender_tag} face events...")
+                    try:
+                        post_response = await client.post(post_url, json={"events": events_to_post})
+                        post_response.raise_for_status()
+                        # If the post was successful (2xx), we assume all events were accepted.
+                        # This makes logging more robust against a potentially incorrect `stored_count`
+                        # from the downstream API, ensuring our logs reflect the number of events
+                        # we successfully transmitted.
+                        stored_in_page = len(events_to_post)
+                        total_posted_count += stored_in_page
+                        logger.info(f"Successfully posted page {page_number} for {gender_tag}. Stored {stored_in_page} face events.")
+                    except httpx.HTTPStatusError as exc:
+                        total_failed_pages += 1
+                        logger.error(f"HTTP error posting page {page_number} of {gender_tag} face events: {exc.response.status_code} - Response: {exc.response.text}")
+                    except Exception as e:
+                        total_failed_pages += 1
+                        logger.error(f"An unexpected error occurred while posting page {page_number} of {gender_tag} face events: {e}", exc_info=True)
+                logger.info(f"--- Finished fetch for GENDER: {gender_tag}. Processed {page_number} page(s). ---")
         
-        except Exception as e:
-            logger.error(f"Failed to process day {current_day_to_process}: {e}. Aborting job run.", exc_info=True)
-            return # Exit if any single day has a critical failure
-
-    logger.info("Face events job finished. System is now caught up.")
+        logger.info("--- Face Event Processing Summary for this Run ---")
+        if total_pages_processed == 0:
+            logger.info("No new face events were found for the processed time window.")
+        else:
+            logger.info(f"Processed {total_pages_processed} page(s) in total. Stored a total of {total_posted_count} face events.")
+            if total_failed_pages > 0:
+                logger.warning(f"Number of failed pages: {total_failed_pages}. These pages were not stored.")
+    except Exception as e:
+        logger.error(f"A critical unhandled error occurred during the face event processing job: {e}", exc_info=True)
 
 
 def face_events_fetch_job():
     """
-    Synchronous wrapper that calls the robust, self-advancing logic.
+    Synchronous wrapper that calls the async face event fetching logic.
     """
-    asyncio.run(face_events_logic())
+    asyncio.run(face_events_fetch_and_post_logic())
 
 
 def start_event_schedulers():
     """
-    (This function is correct and remains unchanged, but includes a helpful
-     suggestion for speeding up the initial backfill)
+    Initializes and starts the background schedulers for fetching generic
+    and face events.
     """
     scheduler = BackgroundScheduler(timezone="UTC")
     
@@ -383,17 +428,12 @@ def start_event_schedulers():
         id="generic_events_job"
     )
     
-    # SUGGESTION: To speed up the initial 30-day backfill, temporarily change
-    # the schedule below to run every few minutes. Once caught up, revert it
-    # to the daily 'cron' schedule.
+    # The face events job runs frequently to ensure new appearances are
+    # ingested quickly for near real-time processing by downstream schedulers.
     scheduler.add_job(
         face_events_fetch_job,
-        'interval',  # Use 'interval' for fast backfilling. Change to 'cron' for normal operation.
-        minutes=1,   # Run every 5 minutes.
-        # cron schedule for normal operation (once caught up):
-        # 'cron',
-        # hour=0,
-        # minute=30,
+        'interval',
+        minutes=1,
         next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20),
         misfire_grace_time=600,
         id="face_events_job"
@@ -401,6 +441,5 @@ def start_event_schedulers():
     
     scheduler.start()
     logger.info("Unified event schedulers started.")
-    logger.info("-> Generic events job runs hourly.")
-    logger.info("-> Face events job is set to run every 5 minutes for backfilling.")
-    # pass
+    logger.info(f"-> Generic events job runs every 1 minute(s).")
+    logger.info(f"-> Face events job runs every 1 minute(s).")
